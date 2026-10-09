@@ -1,0 +1,16 @@
+{
+  "name": "pi-tokenburn",
+  "version": "0.1.0",
+  "description": "Pi extension for live token usage monitoring and budget tracking (Day / Week / Month / Total). 0 prompt tokens.",
+  "keywords": ["pi-package", "pi-extension", "tokenburn", "tokens", "analytics", "budget", "stats"],
+  "license": "MIT",
+  "author": "sorinirimies",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sorinirimies/pi-tokenburn.git"
+  },
+  "homepage": "https://github.com/sorinirimies/pi-tokenburn#readme",
+  "files": ["extensions", "README.md", "LICENSE"],
+  "pi": { "extensions": ["./extensions/tokenburn.ts"] },
+  "peerDependencies": { "@earendil-works/pi-coding-agent": "*" }
+}
