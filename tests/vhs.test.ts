@@ -26,7 +26,7 @@ describe("VHS tapes", () => {
 		it(`${tape}: header, output path and the shared Set block match the house style`, () => {
 			expect(text.split("\n")[0]).toBe(`# VHS tape: ${name}`);
 			expect(text).toContain(`Output examples/vhs/generated/${name}.gif`);
-			for (const setting of ['Set Shell "bash"', "Set FontSize 14", "Set Width 1600", "Set Height 900", "Set PlaybackSpeed 1.0", 'Set Theme "Catppuccin Mocha"']) {
+			for (const setting of ['Set Shell "bash"', "Set FontSize 18", "Set Width 1200", "Set Height 720", "Set Padding 24", "Set PlaybackSpeed 1.0", 'Set Theme "Catppuccin Mocha"']) {
 				expect(text, setting).toContain(setting);
 			}
 			// recordings only ever run on the synthetic fixture, with the real pi but only this extension

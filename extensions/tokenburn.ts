@@ -953,7 +953,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 							rule,
 							...chart,
 							rule,
-							"/tokenburn chart <day|week|month|year|all> · /tokenburn <day|week|month|year|all> sets the status bar · cycle · window · budget · cache",
+							"chart <view> · <view> sets the status bar · cycle · window · budget · cache · live · on|off",
 						].join("\n"),
 						"info",
 					);

@@ -8,7 +8,7 @@
 const port = Number(process.argv[2] ?? 8989);
 
 const REPLY = "Sure. Here is a short answer from the demo model: tokens in, tokens out, nothing leaves this machine.";
-const USAGE = { prompt_tokens: 152_000, completion_tokens: 2_300, total_tokens: 154_300, prompt_tokens_details: { cached_tokens: 148_000 } };
+const USAGE = { prompt_tokens: 5_200, completion_tokens: 420, total_tokens: 5_620, prompt_tokens_details: { cached_tokens: 4_300 } };
 
 const chunk = (delta: object, finish: string | null = null, usage?: object) =>
 	`data: ${JSON.stringify({ id: "demo", object: "chat.completion.chunk", created: 0, model: "demo-model", choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`;

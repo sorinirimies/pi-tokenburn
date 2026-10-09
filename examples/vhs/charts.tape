@@ -9,9 +9,10 @@
 Output examples/vhs/generated/charts.gif
 
 Set Shell "bash"
-Set FontSize 14
-Set Width 1600
-Set Height 900
+Set FontSize 18
+Set Width 1200
+Set Height 720
+Set Padding 24
 Set PlaybackSpeed 1.0
 Set Theme "Catppuccin Mocha"
 

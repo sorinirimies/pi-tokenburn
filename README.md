@@ -55,7 +55,7 @@ Recorded from a real pi with only this plugin loaded, on synthetic data.
 
 ![Charts: day, week, month, year and all-time](examples/vhs/generated/charts.gif)
 
-**Budgets** (`/tokenburn budget day 8000000`, `budget week $25`): the footer turns red past the limit, and the chart draws the budget line with over-budget columns in red:
+**Budgets** (`/tokenburn budget day 150000`, `budget week $2.5`): the footer turns red past the limit, and the chart draws the budget line with over-budget columns in red:
 
 ![Budgets: OVER BUDGET in the footer and red columns in the chart](examples/vhs/generated/budget.gif)
 
@@ -73,20 +73,23 @@ Recorded from a real pi with only this plugin loaded, on synthetic data.
 
 Tab-completion works for all of these. Unknown input prints usage instead of failing. `report <view>` is kept as an alias of `chart <view>`.
 
-Chart example (`/tokenburn chart day`, with a 600M day budget):
+Chart example (`/tokenburn chart day`, with a 150k day budget):
 
 ```
-Daily tokens · last 14 days  ┄ budget 600.00M
-   1.13B │         ██
-         │         ██
-         │┄┄┄┄┄┄┄┄┄██┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄██┄▆▆┄┄┄┄┄┄┄┄┄┄
- 565.16M │         ██                ██ ██ ▇▇
-         │      ▅▅ ██    ▂▂ ██    ▁▁ ██ ██ ██ ▄▄ ▇▇
-         └──────────────────────────────────────────
-          26 27 28 29 30 01 02 03 04 05 06 07 08 09
-          Sa Su Mo Tu We Th Fr Sa Su Mo Tu We Th Fr
-                                                 ▲
-Σ 3.83B ($1264.30) · avg 273.80M/day · peak 1.13B (09-29 Tue)
+Daily tokens · last 14 days  ┄ budget 150.0k
+ 291.9k │                                 ██ ▄▄    
+        │                                 ██ ██    
+        │      ▃▃          ▅▅             ██ ██    
+        │┄┄┄┄┄┄██┄┄┄┄┄┄┄┄┄┄██┄┄┄┄┄┄┄▆▆┄┄┄┄██┄██┄▅▅┄
+ 146.0k │      ██          ██       ██    ██ ██ ██ 
+        │      ██    ▂▂ ▇▇ ██       ██ ▇▇ ██ ██ ██ 
+        │▁▁    ██    ██ ██ ██       ██ ██ ██ ██ ██ 
+        │██ ▇▇ ██ ▅▅ ██ ██ ██ ▃▃ ▁▁ ██ ██ ██ ██ ██ 
+        └──────────────────────────────────────────
+         26 27 28 29 30 01 02 03 04 05 06 07 08 09 
+         Sa Su Mo Tu We Th Fr Sa Su Mo Tu We Th Fr 
+                                                ▲  
+Σ 1.74M ($4.81) · avg 124.4k/day · peak 291.9k (10-07 Wed)
 ```
 
 Weeks start on Monday, in local time.

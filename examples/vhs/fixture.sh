@@ -30,8 +30,8 @@ if [ "${1:-}" = "append" ]; then
     python3 - "$f" <<'PY'
 import json, sys, random, datetime
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-inp, out = random.randint(2, 12), random.randint(400, 2400)
-cr, cw = random.randint(40_000, 160_000), random.randint(0, 9_000)
+inp, out = random.randint(2, 12), random.randint(300, 1800)
+cr, cw = random.randint(1_200, 9_000), random.randint(0, 1_200)
 cost = round(cr * 0.0000003 + out * 0.000015 + cw * 0.00000375 + inp * 0.000003, 4)
 line = {"timestamp": now, "message": {"role": "assistant", "usage": {
     "input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": {"total": cost}}}}
@@ -60,9 +60,9 @@ def day_weight(d):
 
 for ago in range(DAYS - 1, -1, -1):
     day = now.date() - dt.timedelta(days=ago)
-    turns = max(1, int(70 * day_weight(day)))
+    turns = max(1, int(22 * day_weight(day)))
     if ago == 0:
-        turns = max(turns, 14)         # today always has something to show
+        turns = max(turns, 12)         # today always has something to show
     project = rnd.choice(PROJECTS)
     sess_dir = os.path.join(root, "agent", "sessions", f"--home-demo-projects-{project}--")
     os.makedirs(sess_dir, exist_ok=True)
@@ -73,8 +73,8 @@ for ago in range(DAYS - 1, -1, -1):
         if t > now:                    # never write the future
             t = now - dt.timedelta(minutes=rnd.randint(1, 240))
         lines.append((t, {"timestamp": iso(t), "message": {"role": "user", "content": "…"}}))
-        inp, out = rnd.randint(2, 14), rnd.randint(300, 3200)
-        cr, cw = rnd.randint(30_000, 190_000), rnd.randint(0, 11_000)
+        inp, out = rnd.randint(2, 14), rnd.randint(300, 1800)
+        cr, cw = rnd.randint(1_200, 9_000), rnd.randint(0, 1_200)
         cost = round(cr * 0.0000003 + out * 0.000015 + cw * 0.00000375 + inp * 0.000003, 4)
         lines.append((t + dt.timedelta(seconds=20), {"timestamp": iso(t + dt.timedelta(seconds=20)), "message": {
             "role": "assistant", "usage": {"input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": {"total": cost}}}}))
@@ -96,6 +96,6 @@ with open(os.path.join(agent, "models.json"), "w") as f:
                "maxTokens": 8192, "cost": {"input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 3.75}}]}}}, f, indent=2)
 with open(os.path.join(agent, "settings.json"), "w") as f:
     json.dump({"defaultProvider": "demo", "defaultModel": "demo-model", "theme": "dark",
-               "defaultThinkingLevel": "off", "lastChangelogVersion": "9.9.9"}, f, indent=2)
+               "defaultThinkingLevel": "off", "lastChangelogVersion": "9.9.9", "quietStartup": "header"}, f, indent=2)
 PY
 echo "fixture ready: $DEMO"

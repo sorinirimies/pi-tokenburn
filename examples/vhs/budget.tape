@@ -9,9 +9,10 @@
 Output examples/vhs/generated/budget.gif
 
 Set Shell "bash"
-Set FontSize 14
-Set Width 1600
-Set Height 900
+Set FontSize 18
+Set Width 1200
+Set Height 720
+Set Padding 24
 Set PlaybackSpeed 1.0
 Set Theme "Catppuccin Mocha"
 
@@ -27,8 +28,8 @@ Wait+Screen@30s /\[today\]/
 Show
 
 Sleep 1.5s
-# 8M tokens a day: today is past it
-Type "/tokenburn budget day 8000000"
+# 150k tokens a day: today is past it
+Type "/tokenburn budget day 150000"
 Sleep 700ms
 Enter
 Sleep 300ms
@@ -48,7 +49,7 @@ Sleep 300ms
 Enter
 Sleep 800ms
 # A dollar budget works too
-Type "/tokenburn budget week $25"
+Type "/tokenburn budget week $2.5"
 Sleep 700ms
 Enter
 Sleep 300ms
