@@ -1,0 +1,75 @@
+name: Release
+
+# Publishes the package to npm when a vX.Y.Z tag is pushed (or dispatched) and creates
+# a Gitea release. Safe to re-run: publishing is idempotent (skipped when the version is
+# already on npm, e.g. because the GitHub release got there first).
+#
+# Secrets: NPM_TOKEN (npm granular token with "bypass 2FA"), GITEA_TOKEN (release API).
+# No provenance here: npm provenance needs GitHub's OIDC.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.3.1)"
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Test, publish, release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - name: Install git-cliff
+        continue-on-error: true
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      # The tag must be vX.Y.Z and equal the version in package.json.
+      - name: Validate tag
+        id: tag
+        run: nu scripts/ci/validate_tag.nu "${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Quality gate
+        run: nu scripts/ci/quality_gate.nu
+
+      - name: Publish to npm
+        run: nu scripts/ci/npm_publish.nu
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create Gitea release
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          (command -v git-cliff >/dev/null && git-cliff --latest --strip header > notes.md) || echo "Release ${TAG}" > notes.md
+          BODY=$(python3 -c 'import json,sys; print(json.dumps({"tag_name": sys.argv[1], "name": sys.argv[1], "body": open("notes.md").read()}))' "$TAG")
+          curl -s -X POST \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases" \
+            -H "Authorization: token ${{ secrets.GITEA_TOKEN || github.token }}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" || echo "⚠️  Release creation failed (it may already exist)."

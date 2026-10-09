@@ -11,6 +11,20 @@
   },
   "homepage": "https://github.com/sorinirimies/pi-tokenburn#readme",
   "files": ["extensions", "README.md", "LICENSE"],
-  "pi": { "extensions": ["./extensions/tokenburn.ts"] },
-  "peerDependencies": { "@earendil-works/pi-coding-agent": "*" }
+  "pi": {
+    "extensions": ["./extensions/tokenburn.ts"]
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "nu scripts/ci/quality_gate.nu"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^1.1.0",
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
+  }
 }

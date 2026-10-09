@@ -1,0 +1,77 @@
+name: Release
+
+# Publishes the package to npm when a vX.Y.Z tag is pushed (or dispatched).
+# Safe to re-run: publishing is idempotent (skipped when the version is on npm).
+#
+# Secret: NPM_TOKEN — an npm granular access token with "bypass 2FA" and publish
+# rights on this package.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.3.1)"
+        required: true
+
+permissions:
+  contents: write
+  id-token: write # npm provenance
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Test, publish, release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      # The tag must be vX.Y.Z and equal the version in package.json.
+      - name: Validate tag
+        id: tag
+        run: nu scripts/ci/validate_tag.nu "${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Quality gate
+        run: nu scripts/ci/quality_gate.nu
+
+      - name: Publish to npm
+        run: nu scripts/ci/npm_publish.nu --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub release
+        run: |
+          git-cliff --latest --strip header --output notes.md || echo "Release ${{ steps.tag.outputs.tag }}" > notes.md
+          if gh release view "${{ steps.tag.outputs.tag }}" >/dev/null 2>&1; then
+            gh release edit "${{ steps.tag.outputs.tag }}" --notes-file notes.md
+          else
+            gh release create "${{ steps.tag.outputs.tag }}" --title "${{ steps.tag.outputs.tag }}" --notes-file notes.md
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

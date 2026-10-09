@@ -1,0 +1,223 @@
+name: Nightly Dependency Update
+
+# Fully automatic, no human in the loop. Every night, against the CURRENT tip of main:
+#   update   `bun update` (compatible bumps only); note whether anything REALLY moved up
+#   verify   typecheck + tests + pack check on Linux, tests on macOS and Windows
+#   release  commit the lockfile (`chore(deps)`), and, when something worth shipping
+#            exists, bump the patch version, tag vX.Y.Z, push and start release.yml
+#
+# What counts as "worth shipping" (a patch release):
+#   * a RUNTIME dependency was upgraded (it ships to users), or
+#   * feat / fix / perf commits are waiting since the last tag (scripts/ci/unreleased.nu)
+# Dev-tooling-only bumps are committed but never released on their own.
+# No changes => nothing is committed, tagged or released.
+#
+# This host runs on its own: no mirroring to Gitea (it has its own nightly). Publishing
+# to npm is idempotent, so a version released by both hosts is published once.
+#
+# Secrets: NPM_TOKEN is used by release.yml. GH_PAT (optional): lets the tag push itself
+# trigger release.yml and bypass branch protection; without it the release is dispatched.
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 02:00 UTC (Gitea runs at 02:30)
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Bump the patch version, tag and release when there is something to ship"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+# Never cancel mid-run: a half-finished push/tag would leave main inconsistent.
+concurrency:
+  group: deps-update
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Update ───────────────────────────────────────────────────────────────
+  update:
+    name: Update lockfile
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.deps.outputs.changed }}
+      ships: ${{ steps.deps.outputs.ships }}
+      releasable: ${{ steps.unreleased.outputs.releasable }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Snapshot installed versions (before)
+        run: |
+          T="${RUNNER_TEMP:-/tmp}"
+          nu scripts/ci/snapshot_deps.nu "$T/before-all.txt"
+          nu scripts/ci/snapshot_deps.nu "$T/before-prod.txt" --prod
+
+      - name: Update dependencies (within their ranges)
+        run: |
+          bun update
+          bun install
+
+      # Only a REAL upgrade counts: `changed` = anything moved up and nothing down;
+      # `ships` = the same for runtime dependencies only (scripts/ci/dep_changes.nu).
+      - name: Check what changed
+        id: deps
+        run: |
+          T="${RUNNER_TEMP:-/tmp}"
+          nu scripts/ci/snapshot_deps.nu "$T/after-all.txt"
+          nu scripts/ci/snapshot_deps.nu "$T/after-prod.txt" --prod
+          if git diff --quiet -- bun.lock package.json; then
+            echo "No dependency changes detected."
+            printf 'changed=false\nships=false\n' >> "$GITHUB_OUTPUT"
+          else
+            nu scripts/ci/dep_changes.nu "$T/before-all.txt"  "$T/after-all.txt"  --key changed --output "$GITHUB_OUTPUT"
+            nu scripts/ci/dep_changes.nu "$T/before-prod.txt" "$T/after-prod.txt" --key ships   --output "$GITHUB_OUTPUT"
+          fi
+
+      - name: Unreleased feat/fix/perf commits?
+        id: unreleased
+        run: nu scripts/ci/unreleased.nu --output "$GITHUB_OUTPUT"
+
+      - name: Upload updated lockfile
+        if: steps.deps.outputs.changed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: lockfile
+          path: |
+            package.json
+            bun.lock
+          retention-days: 1
+
+  # ── 2. Verify on every platform ─────────────────────────────────────────────
+  verify:
+    name: verify (${{ matrix.os }})
+    needs: update
+    if: needs.update.outputs.changed == 'true' || needs.update.outputs.releasable == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v8
+        if: needs.update.outputs.changed == 'true'
+        with:
+          name: lockfile
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install nushell
+        if: runner.os == 'Linux'
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Quality gate
+        if: runner.os == 'Linux'
+        run: nu scripts/ci/quality_gate.nu
+
+      - name: Typecheck and tests
+        if: runner.os != 'Linux'
+        run: |
+          bun run typecheck
+          bun test
+
+  # ── 3. Commit, bump, tag, push, release ─────────────────────────────────────
+  release:
+    name: Commit and release
+    needs: [update, verify]
+    if: (needs.update.outputs.changed == 'true' || needs.update.outputs.releasable == 'true') && (github.event_name == 'schedule' || inputs.release)
+    runs-on: ubuntu-latest
+    env:
+      HAS_PAT: ${{ secrets.GH_PAT != '' }}
+    steps:
+      # Re-sync to the REAL tip of main: it may have moved while the checks ran.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        if: needs.update.outputs.changed == 'true'
+        with:
+          name: lockfile
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      # Fails (safely) if main's manifest changed in the meantime and the verified
+      # lockfile no longer matches it.
+      - name: Verify the lockfile still matches the manifest
+        run: bun install --frozen-lockfile
+
+      - name: Commit updated dependencies
+        if: needs.update.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json bun.lock
+          git commit -m "chore(deps): nightly update $(date -u '+%Y-%m-%d')"
+
+      - name: Bump patch version, changelog, commit and tag
+        id: bump
+        if: needs.update.outputs.ships == 'true' || needs.update.outputs.releasable == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          nu scripts/bump_version.nu patch --yes --skip-checks
+          echo "tag=v$(nu scripts/version.nu)" >> "$GITHUB_OUTPUT"
+
+      # Fail loudly (no `|| true`): a failed push must show as a failed run.
+      - name: Push
+        run: |
+          git push origin HEAD:main
+          if [ -n "${{ steps.bump.outputs.tag }}" ]; then git push origin "${{ steps.bump.outputs.tag }}"; fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # Pushes authored by GITHUB_TOKEN do NOT trigger other workflows (GitHub's
+      # anti-recursion guard), so dispatch release.yml explicitly. With a PAT the tag
+      # push already started it — dispatching again would only duplicate the run.
+      - name: Trigger release workflow for the new tag
+        if: steps.bump.outputs.tag != '' && env.HAS_PAT != 'true'
+        run: gh workflow run release.yml --repo "${{ github.repository }}" -f tag="${{ steps.bump.outputs.tag }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

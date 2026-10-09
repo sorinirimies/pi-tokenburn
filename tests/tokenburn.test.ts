@@ -32,11 +32,11 @@ describe("pi-tokenburn", () => {
 		const sessionDir = join(testDir, "proj1");
 		mkdirSync(sessionDir, { recursive: true });
 
-		const now = new Date("2026-10-09T12:00:00Z");
+		const now = new Date(2026, 9, 9, 12);
 
 		// Today's entry
 		const todayLine = JSON.stringify({
-			timestamp: "2026-10-09T10:00:00Z",
+			timestamp: new Date(2026, 9, 9, 10).toISOString(),
 			message: {
 				usage: {
 					input: 1000,
@@ -48,7 +48,7 @@ describe("pi-tokenburn", () => {
 
 		// Yesterday's entry (same week)
 		const yesterdayLine = JSON.stringify({
-			timestamp: "2026-10-08T10:00:00Z",
+			timestamp: new Date(2026, 9, 8, 10).toISOString(),
 			message: {
 				usage: {
 					input: 2000,
@@ -60,7 +60,7 @@ describe("pi-tokenburn", () => {
 
 		// Past month entry
 		const oldLine = JSON.stringify({
-			timestamp: "2026-08-01T10:00:00Z",
+			timestamp: new Date(2026, 7, 1, 10).toISOString(),
 			message: {
 				usage: {
 					input: 5000,
@@ -103,9 +103,9 @@ describe("pi-tokenburn", () => {
 		const sessionDir = join(testDir, "p");
 		mkdirSync(sessionDir, { recursive: true });
 		const file = join(sessionDir, "s.jsonl");
-		const now = new Date("2026-10-09T12:00:00Z");
+		const now = new Date(2026, 9, 9, 12);
 		const line = (inp: number) =>
-			JSON.stringify({ timestamp: "2026-10-09T10:00:00Z", message: { usage: { input: inp, output: 0 } } });
+			JSON.stringify({ timestamp: new Date(2026, 9, 9, 10).toISOString(), message: { usage: { input: inp, output: 0 } } });
 
 		writeFileSync(file, line(100) + "\n");
 		expect((await collectUsage(testDir, now)).today.tokens).toBe(100);
@@ -117,13 +117,13 @@ describe("pi-tokenburn", () => {
 	it("skips malformed lines and lines without usage", async () => {
 		const sessionDir = join(testDir, "p");
 		mkdirSync(sessionDir, { recursive: true });
-		const now = new Date("2026-10-09T12:00:00Z");
+		const now = new Date(2026, 9, 9, 12);
 		writeFileSync(
 			join(sessionDir, "s.jsonl"),
 			[
 				"not json with \"usage\"",
-				JSON.stringify({ timestamp: "2026-10-09T10:00:00Z", message: { role: "user" } }),
-				JSON.stringify({ timestamp: "2026-10-09T10:00:00Z", message: { usage: { input: 7, output: 3 } } }),
+				JSON.stringify({ timestamp: new Date(2026, 9, 9, 10).toISOString(), message: { role: "user" } }),
+				JSON.stringify({ timestamp: new Date(2026, 9, 9, 10).toISOString(), message: { usage: { input: 7, output: 3 } } }),
 			].join("\n") + "\n",
 		);
 		expect((await collectUsage(testDir, now)).today.tokens).toBe(10);
@@ -132,11 +132,11 @@ describe("pi-tokenburn", () => {
 	it("counts cache tokens only when includeCache is true", async () => {
 		const sessionDir = join(testDir, "p");
 		mkdirSync(sessionDir, { recursive: true });
-		const now = new Date("2026-10-09T12:00:00Z");
+		const now = new Date(2026, 9, 9, 12);
 		writeFileSync(
 			join(sessionDir, "s.jsonl"),
 			JSON.stringify({
-				timestamp: "2026-10-09T10:00:00Z",
+				timestamp: new Date(2026, 9, 9, 10).toISOString(),
 				message: { usage: { input: 10, output: 5, cacheRead: 1000, cacheWrite: 100 } },
 			}) + "\n",
 		);

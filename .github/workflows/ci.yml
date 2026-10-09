@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch / PR supersedes a stale run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The same gate `just check` and the release run: typecheck + tests + pack + nu tests.
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install nushell
+        uses: hustcer/setup-nu@v3
+        with:
+          version: "0.111.0"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Quality gate
+        run: nu scripts/ci/quality_gate.nu
+
+  # Paths, terminals and time zones differ: run the suite where users run pi.
+  test:
+    name: test (${{ matrix.os }}${{ matrix.tz && format(', {0}', matrix.tz) || '' }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest }
+          - { os: windows-latest }
+          # Day/week/month bucketing is local-time: exercise the extremes.
+          - { os: ubuntu-latest, tz: Pacific/Auckland }
+          - { os: ubuntu-latest, tz: Pacific/Pago_Pago }
+          - { os: ubuntu-latest, tz: America/Los_Angeles }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - name: bun test
+        run: bun test
+        env:
+          TZ: ${{ matrix.tz }}
