@@ -18,6 +18,20 @@ export def published [name: string, version: string]: nothing -> bool {
     ($res.exit_code == 0) and (($res.stdout | str trim) == $version)
 }
 
+# Arguments for `npm publish`.
+export def publish_args [provenance: bool, dry_run: bool]: nothing -> list {
+    mut args = ["publish" "--access" "public"]
+    if $provenance { $args = ($args | append "--provenance") }
+    if $dry_run { $args = ($args | append "--dry-run") }
+    $args
+}
+
+# True when an npm auth token is configured (NODE_AUTH_TOKEN or NPM_TOKEN).
+export def has_token [env_vars: record]: nothing -> bool {
+    let t = ($env_vars | get -o NODE_AUTH_TOKEN | default ($env_vars | get -o NPM_TOKEN | default ""))
+    ($t | is-not-empty)
+}
+
 def main [--provenance, --dry-run] {
     let pkg = (open package.json)
     print $"Package: ($pkg.name)@($pkg.version)"
@@ -27,13 +41,11 @@ def main [--provenance, --dry-run] {
         return
     }
 
-    if not $dry_run and (($env | get -o NODE_AUTH_TOKEN | default ($env | get -o NPM_TOKEN | default "")) | is-empty) {
+    if not $dry_run and not (has_token $env) {
         error make --unspanned { msg: "No npm token: set the NPM_TOKEN secret (granular token with 'bypass 2FA')." }
     }
 
-    mut args = ["publish" "--access" "public"]
-    if $provenance { $args = ($args | append "--provenance") }
-    if $dry_run { $args = ($args | append "--dry-run") }
+    let args = (publish_args $provenance $dry_run)
     run-external "npm" ...$args
     let verb = if $dry_run { "Dry run OK for" } else { "Published" }
     print $"(ansi green)✓(ansi reset) ($verb) ($pkg.name)@($pkg.version)."

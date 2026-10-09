@@ -78,17 +78,23 @@ const DEFAULT_CONFIG: TokenBurnConfig = {
 	budgets: {},
 };
 
-function getConfigDir(): string {
-	if (process.env.PI_CODING_AGENT_DIR) return process.env.PI_CODING_AGENT_DIR;
-	if (process.env.XDG_CONFIG_HOME) return join(process.env.XDG_CONFIG_HOME, "pi", "agent");
-	return join(homedir(), ".pi", "agent");
+/** Where pi keeps its config: PI_CODING_AGENT_DIR, then $XDG_CONFIG_HOME/pi/agent, then ~/.pi/agent. */
+export function resolveAgentDir(env: Record<string, string | undefined>, home: string): string {
+	if (env.PI_CODING_AGENT_DIR) return env.PI_CODING_AGENT_DIR;
+	if (env.XDG_CONFIG_HOME) return join(env.XDG_CONFIG_HOME, "pi", "agent");
+	return join(home, ".pi", "agent");
 }
 
-function getSessionsDir(): string {
-	if (process.env.TOKENBURN_PI_SESSIONS) return process.env.TOKENBURN_PI_SESSIONS;
-	if (process.env.PI_CODING_AGENT_SESSION_DIR) return process.env.PI_CODING_AGENT_SESSION_DIR;
-	return join(getConfigDir(), "sessions");
+/** Pi session logs: TOKENBURN_PI_SESSIONS, PI_CODING_AGENT_SESSION_DIR, then <agent dir>/sessions. */
+export function resolveSessionsDir(env: Record<string, string | undefined>, home: string): string {
+	if (env.TOKENBURN_PI_SESSIONS) return env.TOKENBURN_PI_SESSIONS;
+	if (env.PI_CODING_AGENT_SESSION_DIR) return env.PI_CODING_AGENT_SESSION_DIR;
+	return join(resolveAgentDir(env, home), "sessions");
 }
+
+const getConfigDir = () => resolveAgentDir(process.env, homedir());
+
+const getSessionsDir = () => resolveSessionsDir(process.env, homedir());
 
 export async function loadConfig(): Promise<TokenBurnConfig> {
 	try {
@@ -172,6 +178,16 @@ async function parseFile(file: string): Promise<Turn[]> {
 	return turns;
 }
 
+/** Cache key for a file: mtime + size. `undefined` when it cannot be stat'ed. */
+export function fileSignature(file: string): string | undefined {
+	try {
+		const st = statSync(file);
+		return `${st.mtimeMs}:${st.size}`;
+	} catch {
+		return undefined;
+	}
+}
+
 function listSessionFiles(root: string): string[] {
 	const files: string[] = [];
 	const walk = (dir: string) => {
@@ -209,13 +225,8 @@ async function loadAll(sessionsRoot: string): Promise<Turn[][]> {
 
 	const out: Turn[][] = [];
 	for (const file of files) {
-		let sig: string;
-		try {
-			const st = statSync(file);
-			sig = `${st.mtimeMs}:${st.size}`;
-		} catch {
-			continue;
-		}
+		const sig = fileSignature(file);
+		if (sig === undefined) continue; // vanished between listing and stat
 		let entry = FILE_CACHE.get(file);
 		if (!entry || entry.sig !== sig) {
 			entry = { sig, turns: await parseFile(file) };

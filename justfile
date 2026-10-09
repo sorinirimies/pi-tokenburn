@@ -30,6 +30,11 @@ test: _check-bun
 typecheck: _check-bun
     bunx tsc --noEmit
 
+# Tests with coverage (thresholds from bunfig.toml) and a summary table
+coverage: _check-bun _check-nu
+    bun test
+    nu scripts/ci/coverage_summary.nu
+
 # Run the Nushell script tests
 test-nu: _check-nu
     nu scripts/tests/run_all.nu

@@ -86,8 +86,11 @@ Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CO
 ```bash
 bun install
 just check          # typecheck + tests + pack check + nushell tests (what CI runs)
-just test           # bun test only
+just test           # bun test only (with coverage)
+just coverage       # tests + a coverage table
 ```
+
+**Coverage:** every `bun test` collects coverage (`bunfig.toml`) and **fails below 95% lines / 95% functions**. CI shows the table on the run page and uploads `lcov.info`.
 
 CI scripts are [nushell](https://www.nushell.sh) (`scripts/`), the same ones locally and in GitHub / Gitea Actions.
 `just --list` shows every task.

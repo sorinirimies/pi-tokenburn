@@ -30,8 +30,12 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: Quality gate
+      - name: Quality gate (coverage thresholds are enforced by bunfig.toml)
         run: nu scripts/ci/quality_gate.nu
+
+      - name: Coverage summary
+        if: always()
+        run: nu scripts/ci/coverage_summary.nu
 
   # Day/week/month bucketing is local-time: exercise the extremes.
   timezones:
