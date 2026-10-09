@@ -44,8 +44,12 @@ export interface TokenBurnReport {
 	today: PeriodStats;
 	week: PeriodStats;
 	month: PeriodStats;
+	year: PeriodStats;
 	total: PeriodStats;
 }
+
+export const STATUS_WINDOWS = ["today", "week", "month", "year", "total"] as const;
+export type Window = (typeof STATUS_WINDOWS)[number];
 
 export interface TokenBurnConfig {
 	/** Count cache read/write tokens in totals (matches the tokenburn CLI). */
@@ -54,7 +58,7 @@ export interface TokenBurnConfig {
 	chartColor: boolean;
 	showStatus: boolean;
 	showWidget: boolean;
-	statusWindow: "today" | "week" | "month" | "total";
+	statusWindow: Window;
 	budgets: {
 		dayTokens?: number;
 		weekTokens?: number;
@@ -95,14 +99,19 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 			chartColor: typeof parsed.chartColor === "boolean" ? parsed.chartColor : DEFAULT_CONFIG.chartColor,
 			showStatus: typeof parsed.showStatus === "boolean" ? parsed.showStatus : DEFAULT_CONFIG.showStatus,
 			showWidget: typeof parsed.showWidget === "boolean" ? parsed.showWidget : DEFAULT_CONFIG.showWidget,
-			statusWindow: ["today", "week", "month", "total"].includes(parsed.statusWindow)
+			statusWindow: (STATUS_WINDOWS as readonly string[]).includes(parsed.statusWindow)
 				? parsed.statusWindow
 				: DEFAULT_CONFIG.statusWindow,
-			budgets: typeof parsed.budgets === "object" && parsed.budgets !== null ? parsed.budgets : {},
+			budgets: typeof parsed.budgets === "object" && parsed.budgets !== null ? { ...parsed.budgets } : {},
 		};
 	} catch {
-		return { ...DEFAULT_CONFIG };
+		return freshConfig();
 	}
+}
+
+/** A config that shares no mutable state with DEFAULT_CONFIG. */
+export function freshConfig(): TokenBurnConfig {
+	return { ...DEFAULT_CONFIG, budgets: {} };
 }
 
 export async function saveConfig(cfg: TokenBurnConfig): Promise<void> {
@@ -228,11 +237,13 @@ export async function collectUsage(
 	const startOfDay = bucketStart(now.getTime(), "day");
 	const startOfWeek = bucketStart(now.getTime(), "week");
 	const startOfMonth = bucketStart(now.getTime(), "month");
+	const startOfYear = bucketStart(now.getTime(), "year");
 
 	const report: TokenBurnReport = {
 		today: emptyStats(),
 		week: emptyStats(),
 		month: emptyStats(),
+		year: emptyStats(),
 		total: emptyStats(),
 	};
 
@@ -250,11 +261,13 @@ export async function collectUsage(
 		for (const t of turns) {
 			if (t.ts > maxTs) maxTs = t.ts;
 			add(report.total, t);
+			if (t.ts >= startOfYear) add(report.year, t);
 			if (t.ts >= startOfMonth) add(report.month, t);
 			if (t.ts >= startOfWeek) add(report.week, t);
 			if (t.ts >= startOfDay) add(report.today, t);
 		}
 		if (turns.length > 0) report.total.sessions++;
+		if (maxTs >= startOfYear) report.year.sessions++;
 		if (maxTs >= startOfMonth) report.month.sessions++;
 		if (maxTs >= startOfWeek) report.week.sessions++;
 		if (maxTs >= startOfDay) report.today.sessions++;
@@ -267,7 +280,7 @@ export async function collectUsage(
 // Time series + chart
 // ---------------------------------------------------------------------------
 
-export type Unit = "day" | "week" | "month";
+export type Unit = "day" | "week" | "month" | "year";
 
 /** Local-time start of the day / Monday-week / month containing `ts`. */
 export function bucketStart(ts: number, unit: Unit): number {
@@ -277,6 +290,7 @@ export function bucketStart(ts: number, unit: Unit): number {
 		const dow = (d.getDay() + 6) % 7; // Monday = 0
 		return new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow).getTime();
 	}
+	if (unit === "year") return new Date(d.getFullYear(), 0, 1).getTime();
 	return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
 }
 
@@ -284,6 +298,7 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export function bucketLabel(start: number, unit: Unit): string {
 	const d = new Date(start);
+	if (unit === "year") return String(d.getFullYear());
 	if (unit === "month") return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 	const base = `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 	return unit === "day" ? `${base} ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]}` : `${base} wk`;
@@ -296,7 +311,7 @@ export interface SeriesPoint {
 	cost: number;
 }
 
-export const DEFAULT_COUNT: Record<Unit, number> = { day: 14, week: 8, month: 6 };
+export const DEFAULT_COUNT: Record<Unit, number> = { day: 14, week: 8, month: 6, year: 5 };
 
 /** Last `count` buckets ending at `now`, oldest first, empty buckets zero-filled. */
 export async function collectSeries(
@@ -316,7 +331,9 @@ export async function collectSeries(
 				? new Date(y, m, day - i)
 				: unit === "week"
 					? new Date(y, m, day - i * 7)
-					: new Date(y, m - i, 1);
+					: unit === "year"
+						? new Date(y - i, 0, 1)
+						: new Date(y, m - i, 1);
 		starts.push(bucketStart(anchor.getTime(), unit));
 	}
 	const points = new Map<number, SeriesPoint>(
@@ -331,6 +348,27 @@ export async function collectSeries(
 		}
 	}
 	return starts.map((s) => points.get(s)!);
+}
+
+/**
+ * Whole history: monthly columns while it spans <= 18 months, yearly after that.
+ * Always at least 2 columns so the chart has a shape.
+ */
+export async function collectAllSeries(
+	sessionsRoot: string,
+	now: Date = new Date(),
+	includeCache = true,
+): Promise<{ unit: Unit; series: SeriesPoint[] }> {
+	let first = now.getTime();
+	for (const turns of await loadAll(sessionsRoot)) for (const t of turns) if (t.ts < first) first = t.ts;
+	const f = new Date(first);
+	const months = (now.getFullYear() - f.getFullYear()) * 12 + (now.getMonth() - f.getMonth()) + 1;
+	if (months <= 18) {
+		const unit: Unit = "month";
+		return { unit, series: await collectSeries(sessionsRoot, unit, Math.max(2, months), now, includeCache) };
+	}
+	const years = now.getFullYear() - f.getFullYear() + 1;
+	return { unit: "year", series: await collectSeries(sessionsRoot, "year", years, now, includeCache) };
 }
 
 const EIGHTHS = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"];
@@ -350,8 +388,8 @@ export function sparkline(values: number[]): string {
 	return values.map((v) => SPARK[Math.min(7, Math.round((v / max) * 7))]).join("");
 }
 
-const UNIT_TITLE: Record<Unit, string> = { day: "Daily", week: "Weekly", month: "Monthly" };
-const UNIT_NOUN: Record<Unit, string> = { day: "day", week: "week", month: "month" };
+const UNIT_TITLE: Record<Unit, string> = { day: "Daily", week: "Weekly", month: "Monthly", year: "Yearly" };
+const UNIT_NOUN: Record<Unit, string> = { day: "day", week: "week", month: "month", year: "year" };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export type Paint = (kind: "bar" | "now" | "over" | "axis" | "budget" | "dim" | "title", text: string) => string;
@@ -362,6 +400,7 @@ function columnLabels(p: SeriesPoint, unit: Unit): [string, string] {
 	const d = new Date(p.start);
 	if (unit === "day") return [pad2(d.getDate()), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d.getDay()]];
 	if (unit === "week") return [`${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, "wk"];
+	if (unit === "year") return [String(d.getFullYear()), ""];
 	return [MONTHS[d.getMonth()], String(d.getFullYear())];
 }
 
@@ -372,7 +411,7 @@ function columnLabels(p: SeriesPoint, unit: Unit): [string, string] {
 export function renderChart(
 	series: SeriesPoint[],
 	unit: Unit,
-	opts: { height?: number; budget?: { tokens?: number; cost?: number }; paint?: Paint } = {},
+	opts: { height?: number; budget?: { tokens?: number; cost?: number }; paint?: Paint; title?: string } = {},
 ): string[] {
 	const paint = opts.paint ?? plain;
 	const height = opts.height ?? 8;
@@ -398,8 +437,8 @@ export function renderChart(
 
 	const lines: string[] = [];
 	lines.push(
-		paint("title", `${UNIT_TITLE[unit]} tokens`) +
-			paint("dim", ` · last ${series.length} ${UNIT_NOUN[unit]}s`) +
+		paint("title", opts.title ?? `${UNIT_TITLE[unit]} tokens`) +
+			paint("dim", ` · ${opts.title ? "" : "last "}${series.length} ${UNIT_NOUN[unit]}${series.length === 1 ? "" : "s"}`) +
 			(budgetTokens ? paint("budget", `  ┄ budget ${formatNum(budgetTokens)}`) : ""),
 	);
 
@@ -443,8 +482,6 @@ export function clearCache(): void {
 	FILE_CACHE.clear();
 }
 
-export type Window = "today" | "week" | "month" | "total";
-
 export function budgetsFor(cfg: TokenBurnConfig, w: Window): { tokens?: number; cost?: number } {
 	const b = cfg.budgets;
 	if (w === "today") return { tokens: b.dayTokens, cost: b.dayCost };
@@ -472,7 +509,7 @@ export function themePaint(theme: { fg: (c: any, t: string) => string }): Paint 
 }
 
 export default function tokenBurnExtension(pi: ExtensionAPI) {
-	let config: TokenBurnConfig = { ...DEFAULT_CONFIG };
+	let config: TokenBurnConfig = freshConfig();
 
 	const updateUI = async (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) return;
@@ -510,6 +547,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 				line("Today", report.today, budgetsFor(config, "today")),
 				line("Week", report.week, budgetsFor(config, "week")),
 				line("Month", report.month, budgetsFor(config, "month")),
+				line("Year", report.year),
 				line("Total", report.total),
 				`└${"─".repeat(46)}┘`,
 			];
@@ -531,91 +569,199 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("tokenburn", {
-		description: "TokenBurn stats: show report, toggle widget, or set budgets",
-		getArgumentCompletions: (prefix: string) => {
-			const opts = ["report", "day", "week", "month", "today", "total", "cycle", "window", "cache", "status <today|week|month|total>", "budget <day|week|month> <tokens|$cost>"];
-			return opts.filter((o) => o.startsWith(prefix)).map((value) => ({ value }));
-		},
+		description: "TokenBurn: /tokenburn [day|week|month|year|all] chart, status <window>, cycle, window, budget, cache",
+		getArgumentCompletions: (prefix: string) => completions(prefix),
 		handler: async (args, ctx) => {
-			const [cmd, p1, p2] = (args ?? "").trim().split(/\s+/).filter(Boolean);
-
-			if (cmd === "window" || cmd === "widget") {
-				config.showWidget = !config.showWidget;
+			const cmd = parseCommand(args);
+			const persist = async () => {
 				await saveConfig(config);
 				await updateUI(ctx);
-				ctx.ui.notify(`tokenburn widget: ${config.showWidget ? "enabled" : "hidden"}`, "info");
-				return;
-			}
-
-			const WINDOWS = ["today", "week", "month", "total"] as const;
-			const setWindow = async (w: (typeof WINDOWS)[number]) => {
-				config.statusWindow = w;
-				await saveConfig(config);
-				await updateUI(ctx);
-				ctx.ui.notify(`tokenburn status window: ${w}`, "info");
 			};
 
-			// /tokenburn today|week|month|total  — shortcut for the status bar period
-			if ((WINDOWS as readonly string[]).includes(cmd ?? "")) {
-				await setWindow(cmd as (typeof WINDOWS)[number]);
-				return;
-			}
-			if (cmd === "status" && (WINDOWS as readonly string[]).includes(p1 ?? "")) {
-				await setWindow(p1 as (typeof WINDOWS)[number]);
-				return;
-			}
-			// /tokenburn cycle  — today → week → month → total → today
-			if (cmd === "cycle") {
-				await setWindow(WINDOWS[(WINDOWS.indexOf(config.statusWindow) + 1) % WINDOWS.length]);
-				return;
-			}
+			switch (cmd.kind) {
+				case "window":
+					config.showWidget = !config.showWidget;
+					await persist();
+					ctx.ui.notify(`tokenburn widget: ${config.showWidget ? "enabled" : "hidden"}`, "info");
+					return;
 
-			if (cmd === "cache") {
-				config.includeCache = !config.includeCache;
-				await saveConfig(config);
-				await updateUI(ctx);
-				ctx.ui.notify(`tokenburn: cache tokens ${config.includeCache ? "included" : "excluded"}`, "info");
-				return;
-			}
+				case "status":
+					config.statusWindow = cmd.window;
+					await persist();
+					ctx.ui.notify(`tokenburn status window: ${cmd.window}`, "info");
+					return;
 
-			if (cmd === "budget") {
-				const isCost = (p2 ?? "").startsWith("$");
-				const val = Number((p2 ?? "").replace(/^\$/, ""));
-				if (!["day", "week", "month"].includes(p1 ?? "") || !Number.isFinite(val) || val <= 0) {
-					ctx.ui.notify("Usage: /tokenburn budget <day|week|month> <tokens | $cost>", "warning");
+				case "cycle": {
+					const next = STATUS_WINDOWS[(STATUS_WINDOWS.indexOf(config.statusWindow) + 1) % STATUS_WINDOWS.length];
+					config.statusWindow = next;
+					await persist();
+					ctx.ui.notify(`tokenburn status window: ${next}`, "info");
 					return;
 				}
-				const key = `${p1}${isCost ? "Cost" : "Tokens"}` as keyof TokenBurnConfig["budgets"];
-				config.budgets[key] = val;
-				await saveConfig(config);
-				await updateUI(ctx);
-				ctx.ui.notify(`tokenburn ${p1} budget: ${isCost ? formatCost(val) : formatNum(val) + " tokens"}`, "info");
-				return;
+
+				case "cache":
+					config.includeCache = !config.includeCache;
+					await persist();
+					ctx.ui.notify(`tokenburn: cache tokens ${config.includeCache ? "included" : "excluded"}`, "info");
+					return;
+
+				case "budget": {
+					const key = `${cmd.period}${cmd.isCost ? "Cost" : "Tokens"}` as keyof TokenBurnConfig["budgets"];
+					config.budgets[key] = cmd.amount;
+					await persist();
+					ctx.ui.notify(
+						`tokenburn ${cmd.period} budget: ${cmd.isCost ? formatCost(cmd.amount) : formatNum(cmd.amount) + " tokens"}`,
+						"info",
+					);
+					return;
+				}
+
+				case "invalid":
+					ctx.ui.notify(cmd.message, "warning");
+					return;
+
+				case "report": {
+					const root = getSessionsDir();
+					const now = new Date();
+					const report = await collectUsage(root, now, config.includeCache);
+					const paint = config.chartColor ? themePaint(ctx.ui.theme) : undefined;
+
+					let chart: string[];
+					if (cmd.view === "all") {
+						const all = await collectAllSeries(root, now, config.includeCache);
+						chart = renderChart(all.series, all.unit, { paint, title: "All time" });
+					} else {
+						const series = await collectSeries(root, cmd.view, DEFAULT_COUNT[cmd.view], now, config.includeCache);
+						const budgetWindow: Window | undefined =
+							cmd.view === "day" ? "today" : cmd.view === "year" ? undefined : cmd.view;
+						chart = renderChart(series, cmd.view, {
+							paint,
+							budget: budgetWindow ? budgetsFor(config, budgetWindow) : undefined,
+						});
+					}
+
+					const row = (name: string, p: PeriodStats) =>
+						`${name.padEnd(10)} ${formatNum(p.tokens).padStart(8)} tokens ${formatCost(p.cost).padStart(9)} · in:${formatNum(p.input)} out:${formatNum(p.output)} cache:${formatNum(p.cacheRead + p.cacheWrite)} · ${p.sessions} sess`;
+					const rule = "─".repeat(60);
+					ctx.ui.notify(
+						[
+							"🔥 TokenBurn Report",
+							rule,
+							row("Today", report.today),
+							row("This Week", report.week),
+							row("This Month", report.month),
+							row("This Year", report.year),
+							row("All Time", report.total),
+							rule,
+							...chart,
+							rule,
+							"/tokenburn day|week|month|year|all · status <window> · cycle · window · budget · cache",
+						].join("\n"),
+						"info",
+					);
+					return;
+				}
 			}
-
-			// /tokenburn [report] [day|week|month]  — summary + chart
-			const unitArg = (cmd === "report" || cmd === "chart" ? p1 : cmd) as string | undefined;
-			const unit: Unit = unitArg === "week" || unitArg === "month" ? unitArg : "day";
-			const report = await collectUsage(getSessionsDir(), new Date(), config.includeCache);
-			const series = await collectSeries(getSessionsDir(), unit, DEFAULT_COUNT[unit], new Date(), config.includeCache);
-			const budgetKey = unit === "day" ? "today" : unit === "week" ? "week" : "month";
-			const formatRow = (name: string, p: PeriodStats) =>
-				`${name.padEnd(10)} ${formatNum(p.tokens).padStart(8)} tokens ${formatCost(p.cost).padStart(9)} · in:${formatNum(p.input)} out:${formatNum(p.output)} cache:${formatNum(p.cacheRead + p.cacheWrite)} · ${p.sessions} sess`;
-
-			const output = [
-				"🔥 TokenBurn Report",
-				"─".repeat(60),
-				formatRow("Today", report.today),
-				formatRow("This Week", report.week),
-				formatRow("This Month", report.month),
-				formatRow("All Time", report.total),
-				"─".repeat(60),
-				...renderChart(series, unit, { budget: budgetsFor(config, budgetKey as Window), paint: config.chartColor ? themePaint(ctx.ui.theme) : undefined }),
-				"─".repeat(60),
-				"/tokenburn [day|week|month] chart · today|week|month|total|cycle status bar · window · budget · cache",
-			].join("\n");
-
-			ctx.ui.notify(output, "info");
 		},
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Command parsing + completions (pure, unit-tested)
+// ---------------------------------------------------------------------------
+
+export const REPORT_VIEWS = ["day", "week", "month", "year", "all"] as const;
+export type ReportView = (typeof REPORT_VIEWS)[number];
+export const BUDGET_PERIODS = ["day", "week", "month"] as const;
+
+export type Command =
+	| { kind: "report"; view: ReportView }
+	| { kind: "status"; window: Window }
+	| { kind: "cycle" }
+	| { kind: "window" }
+	| { kind: "cache" }
+	| { kind: "budget"; period: (typeof BUDGET_PERIODS)[number]; amount: number; isCost: boolean }
+	| { kind: "invalid"; message: string };
+
+export const USAGE =
+	"Usage: /tokenburn [day|week|month|year|all] · status <today|week|month|year|total> · cycle · window · budget <day|week|month> <tokens|$cost> · cache";
+
+const asView = (w: string | undefined): ReportView | undefined =>
+	w === "today" ? "day" : (REPORT_VIEWS as readonly string[]).includes(w ?? "") ? (w as ReportView) : undefined;
+
+export function parseCommand(args: string | undefined): Command {
+	const [cmd, p1, p2] = (args ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+	if (!cmd) return { kind: "report", view: "day" };
+
+	const view = asView(cmd);
+	if (view) return { kind: "report", view };
+
+	switch (cmd) {
+		case "report":
+		case "chart": {
+			if (p1 === undefined) return { kind: "report", view: "day" };
+			const v = asView(p1);
+			return v ? { kind: "report", view: v } : { kind: "invalid", message: `Unknown view "${p1}". ${USAGE}` };
+		}
+		case "status":
+			return (STATUS_WINDOWS as readonly string[]).includes(p1 ?? "")
+				? { kind: "status", window: p1 as Window }
+				: { kind: "invalid", message: `Usage: /tokenburn status <${STATUS_WINDOWS.join("|")}>` };
+		case "cycle":
+			return { kind: "cycle" };
+		case "window":
+		case "widget":
+			return { kind: "window" };
+		case "cache":
+			return { kind: "cache" };
+		case "budget": {
+			const isCost = (p2 ?? "").startsWith("$");
+			const amount = Number((p2 ?? "").replace(/^\$/, ""));
+			if (!(BUDGET_PERIODS as readonly string[]).includes(p1 ?? "") || !Number.isFinite(amount) || amount <= 0) {
+				return { kind: "invalid", message: "Usage: /tokenburn budget <day|week|month> <tokens | $cost>" };
+			}
+			return { kind: "budget", period: p1 as (typeof BUDGET_PERIODS)[number], amount, isCost };
+		}
+		default:
+			return { kind: "invalid", message: `Unknown option "${cmd}". ${USAGE}` };
+	}
+}
+
+export interface CompletionItem {
+	value: string;
+	/** Required by pi: it calls `label.endsWith(...)` when applying a completion. */
+	label: string;
+	description?: string;
+}
+
+const TOP_LEVEL: CompletionItem[] = [
+	{ value: "day", label: "day", description: "Report + daily chart (last 14 days)" },
+	{ value: "week", label: "week", description: "Report + weekly chart (last 8 weeks)" },
+	{ value: "month", label: "month", description: "Report + monthly chart (last 6 months)" },
+	{ value: "year", label: "year", description: "Report + yearly chart (last 5 years)" },
+	{ value: "all", label: "all", description: "Report + whole history" },
+	{ value: "status ", label: "status", description: "Set the status-bar period" },
+	{ value: "cycle", label: "cycle", description: "Rotate the status-bar period" },
+	{ value: "window", label: "window", description: "Toggle the panel below the editor" },
+	{ value: "budget ", label: "budget", description: "Set a day/week/month budget" },
+	{ value: "cache", label: "cache", description: "Toggle counting cache tokens" },
+];
+
+/** `prefix` is the whole argument text typed so far (pi replaces it with `value`). */
+export function completions(prefix: string): CompletionItem[] | null {
+	const text = (prefix ?? "").toLowerCase().replace(/^\s+/, "");
+	const sub = (head: string, words: readonly string[], desc: (w: string) => string): CompletionItem[] =>
+		words.map((w) => ({ value: `${head} ${w}`, label: w, description: desc(w) }));
+
+	let pool: CompletionItem[];
+	if (text.startsWith("status ")) pool = sub("status", STATUS_WINDOWS, (w) => `Show ${w} in the status bar`);
+	else if (text.startsWith("budget ") && !/^budget \S+ /.test(text))
+		pool = sub("budget", BUDGET_PERIODS, (w) => `Set the ${w} budget (tokens or $cost)`);
+	else if (/^(report|chart) /.test(text)) {
+		const head = text.split(" ")[0];
+		pool = sub(head, REPORT_VIEWS, (w) => `${head} for ${w}`);
+	} else pool = TOP_LEVEL;
+
+	const out = pool.filter((i) => i.value.startsWith(text));
+	return out.length > 0 ? out : null;
 }

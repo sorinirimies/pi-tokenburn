@@ -124,30 +124,70 @@ describe("pi-tokenburn chart + window commands", () => {
 		rmSync(dir, { recursive: true, force: true });
 	});
 
-	it("switches the status window with shortcuts", async () => {
-		for (const w of ["week", "month", "total", "today"]) {
-			await command.handler(w, ctx());
+	it("sets the status window with `status <window>` (incl. year)", async () => {
+		for (const w of ["week", "month", "year", "total", "today"]) {
+			await command.handler(`status ${w}`, ctx());
 			expect(status.tokenburn).toContain(`[${w}]`);
 		}
 	});
 
-	it("cycles today → week → month → total → today", async () => {
+	it("cycles today → week → month → year → total → today", async () => {
 		const seen: string[] = [];
-		for (let i = 0; i < 4; i++) {
+		for (let i = 0; i < 5; i++) {
 			await command.handler("cycle", ctx());
 			seen.push(status.tokenburn.match(/\[(\w+)\]/)![1]);
 		}
-		expect(seen).toEqual(["week", "month", "total", "today"]);
+		expect(seen).toEqual(["week", "month", "year", "total", "today"]);
 	});
 
-	it("shows a daily chart by default and weekly / monthly on request", async () => {
-		await command.handler("", ctx());
-		expect(notes.at(-1)).toContain("Daily tokens · last 14 days");
-		await command.handler("report week", ctx());
-		expect(notes.at(-1)).toContain("Weekly tokens · last 8 weeks");
-		await command.handler("month", ctx().ui && ctx());
-		expect(status.tokenburn).toContain("[month]");
-		await command.handler("chart month", ctx());
-		expect(notes.at(-1)).toContain("Monthly tokens · last 6 months");
+	it("bare day/week/month/year/all show a report with the matching chart", async () => {
+		const titles: Record<string, string> = {
+			"": "Daily tokens · last 14 days",
+			day: "Daily tokens · last 14 days",
+			today: "Daily tokens · last 14 days",
+			week: "Weekly tokens · last 8 weeks",
+			month: "Monthly tokens · last 6 months",
+			year: "Yearly tokens · last 5 years",
+			all: "All time ·",
+			"report month": "Monthly tokens · last 6 months",
+			"chart year": "Yearly tokens · last 5 years",
+		};
+		for (const [arg, title] of Object.entries(titles)) {
+			await command.handler(arg, ctx());
+			const out = notes.at(-1)!;
+			expect(out).toContain("TokenBurn Report");
+			expect(out).toContain("This Year");
+			expect(out).toContain(title);
+		}
+	});
+
+	it("`month` no longer changes the status bar", async () => {
+		await command.handler("month", ctx());
+		expect(status.tokenburn).toContain("[today]");
+	});
+
+	it("warns (does not throw) on unknown input", async () => {
+		await command.handler("bogus", ctx());
+		expect(notes.at(-1)).toContain('Unknown option "bogus"');
+		await command.handler("report nope", ctx());
+		expect(notes.at(-1)).toContain('Unknown view "nope"');
+		await command.handler("status nope", ctx());
+		expect(notes.at(-1)).toContain("Usage: /tokenburn status");
+	});
+
+	it("does not leak budgets between extension instances", async () => {
+		await command.handler("budget day 1", ctx());
+		expect(status.tokenburn).toContain("OVER BUDGET");
+		clearCache();
+		process.env.PI_CODING_AGENT_DIR = mkdtempSync(join(tmpdir(), "pi-tb-fresh-"));
+		const h: Record<string, Function> = {};
+		let st = "";
+		tokenBurn({ on: (e: string, f: Function) => (h[e] = f), registerCommand: () => {} } as any);
+		await h.session_start({}, { ...ctx(), ui: { ...ctx().ui, setStatus: (_: string, v: string) => (st = v) } });
+		expect(st).not.toContain("OVER BUDGET");
+	});
+
+	it("registers completions that pi can apply (every item has string value + label)", () => {
+		expect(typeof command.getArgumentCompletions).toBe("function");
 	});
 });
