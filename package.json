@@ -1,6 +1,6 @@
 {
   "name": "pi-tokenburn",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Pi extension for live token usage monitoring and budget tracking (Day / Week / Month / Total). 0 prompt tokens.",
   "keywords": ["pi-package", "pi-extension", "tokenburn", "tokens", "analytics", "budget", "stats"],
   "license": "MIT",

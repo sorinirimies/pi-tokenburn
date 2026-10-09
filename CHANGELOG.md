@@ -3,8 +3,12 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
-## [0.3.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.3.1) — 2026-10-09
+## [0.4.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.4.0) — 2026-10-09
 
+
+### ✨ Features
+
+- Bare day|week|month|year|all switch the status line, charts moved to /tokenburn chart <view>; sanitise hand-edited budgets; pin actions to SHAs and pass tags via env ([`3a151df`](https://github.com/sorinirimies/pi-tokenburn/commit/3a151df0db28655772fdef8e18e0d3b09d58e610))
 
 ### 🐛 Fixes
 
