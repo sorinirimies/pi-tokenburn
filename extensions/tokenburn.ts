@@ -15,7 +15,7 @@
  */
 
 import { readdirSync, statSync } from "node:fs";
-import { open } from "node:fs/promises";
+import { open, type FileHandle } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -52,6 +52,12 @@ export const STATUS_WINDOWS = ["today", "week", "month", "year", "total"] as con
 export type Window = (typeof STATUS_WINDOWS)[number];
 
 export interface TokenBurnConfig {
+	/** Master switch. When false nothing runs in the background and the status line / panel are cleared. */
+	enabled: boolean;
+	/** Refresh after each assistant message (coalesced), not only when a turn ends. */
+	liveRefresh: boolean;
+	/** Trailing delay for live refreshes, in ms (250 to 60000). */
+	refreshMs: number;
 	/** Count cache read/write tokens in totals (matches the tokenburn CLI). */
 	includeCache: boolean;
 	/** Color the report chart (set false if your terminal garbles ANSI in notifications). */
@@ -70,6 +76,9 @@ export interface TokenBurnConfig {
 }
 
 const DEFAULT_CONFIG: TokenBurnConfig = {
+	enabled: true,
+	liveRefresh: true,
+	refreshMs: 750,
 	includeCache: true,
 	chartColor: true,
 	showStatus: true,
@@ -101,6 +110,9 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 		const raw = await readFile(join(getConfigDir(), "tokenburn.json"), "utf8");
 		const parsed = JSON.parse(raw);
 		return {
+			enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_CONFIG.enabled,
+			liveRefresh: typeof parsed.liveRefresh === "boolean" ? parsed.liveRefresh : DEFAULT_CONFIG.liveRefresh,
+			refreshMs: sanitizeRefreshMs(parsed.refreshMs),
 			includeCache: typeof parsed.includeCache === "boolean" ? parsed.includeCache : DEFAULT_CONFIG.includeCache,
 			chartColor: typeof parsed.chartColor === "boolean" ? parsed.chartColor : DEFAULT_CONFIG.chartColor,
 			showStatus: typeof parsed.showStatus === "boolean" ? parsed.showStatus : DEFAULT_CONFIG.showStatus,
@@ -113,6 +125,12 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 	} catch {
 		return freshConfig();
 	}
+}
+
+/** Live-refresh delay: a finite number clamped to 250..60000 ms, else the default. */
+export function sanitizeRefreshMs(value: unknown): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONFIG.refreshMs;
+	return Math.min(60_000, Math.max(250, Math.round(value)));
 }
 
 const BUDGET_KEYS = ["dayTokens", "weekTokens", "monthTokens", "dayCost", "weekCost", "monthCost"] as const;
@@ -158,44 +176,157 @@ interface Turn {
 	cost: number;
 }
 
-/** Parsed turns per session file, reused while the file is unchanged (mtime + size). */
-const FILE_CACHE = new Map<string, { sig: string; turns: Turn[] }>();
+/** What was read from disk, for tests and tuning: refreshes must cost O(new bytes). */
+export const stats = { bytesRead: 0, fullParses: 0, incrementalParses: 0 };
 
-async function parseFile(file: string): Promise<Turn[]> {
-	const turns: Turn[] = [];
-	try {
-		const fd = await open(file, "r");
-		try {
-			for await (const line of fd.readLines({ encoding: "utf8" })) {
-				if (!line.includes('"usage"')) continue;
-				try {
-					const obj = JSON.parse(line);
-					const usage = obj.message?.usage;
-					if (!obj.timestamp || !usage) continue;
-					const ts = new Date(obj.timestamp).getTime();
-					if (!Number.isFinite(ts)) continue;
-					turns.push({
-						ts,
-						input: Number(usage.input) || 0,
-						output: Number(usage.output) || 0,
-						cacheRead: Number(usage.cacheRead) || 0,
-						cacheWrite: Number(usage.cacheWrite) || 0,
-						cost: Number(usage.cost?.total) || 0,
-					});
-				} catch {}
-			}
-		} finally {
-			await fd.close();
-		}
-	} catch {}
-	return turns;
+export function resetStats(): void {
+	stats.bytesRead = 0;
+	stats.fullParses = 0;
+	stats.incrementalParses = 0;
 }
 
-/** Cache key for a file: mtime + size. `undefined` when it cannot be stat'ed. */
-export function fileSignature(file: string): string | undefined {
+/**
+ * Per-session-file parse state. Pi session logs are append-only JSONL, so after the first
+ * parse only the bytes added since then are read. The state is dropped (full reparse) when
+ * the file shrank, was rewritten in place, or its head / last-parsed bytes no longer match.
+ */
+interface FileEntry {
+	size: number;
+	mtimeMs: number;
+	/** End of the last COMPLETE (newline-terminated) line that was parsed. */
+	offset: number;
+	turns: Turn[];
+	/** Turn from an unterminated final line; counted now, re-parsed once the line completes. */
+	tail: Turn[];
+	/** First bytes of the file, to notice a rewrite. */
+	head: Buffer;
+	/** The bytes just before `offset`, same purpose. */
+	guard: Buffer;
+}
+
+const FILE_CACHE = new Map<string, FileEntry>();
+const GUARD_BYTES = 64;
+const HEAD_BYTES = 256;
+const CHUNK_BYTES = 1 << 20;
+
+/** A Turn from one JSONL line, or undefined when it carries no usage. */
+function turnFromLine(line: Buffer): Turn | undefined {
+	if (!line.includes('"usage"')) return undefined; // most lines: skip without a JSON parse
+	try {
+		const obj = JSON.parse(line.toString("utf8"));
+		const usage = obj.message?.usage;
+		if (!obj.timestamp || !usage) return undefined;
+		const ts = new Date(obj.timestamp).getTime();
+		if (!Number.isFinite(ts)) return undefined;
+		return {
+			ts,
+			input: Number(usage.input) || 0,
+			output: Number(usage.output) || 0,
+			cacheRead: Number(usage.cacheRead) || 0,
+			cacheWrite: Number(usage.cacheWrite) || 0,
+			cost: Number(usage.cost?.total) || 0,
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+async function readAt(fd: FileHandle, buf: Buffer, position: number): Promise<number> {
+	const { bytesRead } = await fd.read(buf, 0, buf.length, position);
+	stats.bytesRead += bytesRead;
+	return bytesRead;
+}
+
+/** Parse complete lines in [start, end). Returns their turns, where they stop, and the unterminated rest. */
+async function scan(
+	fd: FileHandle,
+	start: number,
+	end: number,
+	chunkSize: number,
+): Promise<{ turns: Turn[]; consumed: number; rest: Buffer }> {
+	const turns: Turn[] = [];
+	const buf = Buffer.allocUnsafe(Math.min(chunkSize, Math.max(1, end - start)));
+	let pos = start;
+	let consumed = start;
+	let carry: Buffer = Buffer.alloc(0);
+	while (pos < end) {
+		const want = Math.min(buf.length, end - pos);
+		const n = await readAt(fd, want === buf.length ? buf : buf.subarray(0, want), pos);
+		if (n === 0) break;
+		const base = pos - carry.length;
+		const data = carry.length > 0 ? Buffer.concat([carry, buf.subarray(0, n)]) : buf.subarray(0, n);
+		let lineStart = 0;
+		for (let nl = data.indexOf(10, lineStart); nl !== -1; nl = data.indexOf(10, lineStart)) {
+			const t = turnFromLine(data.subarray(lineStart, nl));
+			if (t) turns.push(t);
+			lineStart = nl + 1;
+		}
+		if (lineStart > 0) consumed = base + lineStart;
+		carry = Buffer.from(data.subarray(lineStart)); // copy: `buf` is reused
+		pos += n;
+	}
+	return { turns, consumed, rest: carry };
+}
+
+async function bytesAt(fd: FileHandle, position: number, length: number): Promise<Buffer> {
+	if (length <= 0) return Buffer.alloc(0);
+	const buf = Buffer.alloc(length);
+	const n = await readAt(fd, buf, position);
+	return buf.subarray(0, n);
+}
+
+/** Is the prefix we parsed earlier still what is on disk? */
+async function stillAppendOnly(fd: FileHandle, prev: FileEntry): Promise<boolean> {
+	const head = await bytesAt(fd, 0, prev.head.length);
+	if (!head.equals(prev.head)) return false;
+	const guard = await bytesAt(fd, prev.offset - prev.guard.length, prev.guard.length);
+	return guard.equals(prev.guard);
+}
+
+async function refreshEntry(
+	file: string,
+	st: { size: number; mtimeMs: number },
+	prev: FileEntry | undefined,
+	chunkSize: number,
+): Promise<FileEntry | undefined> {
+	let fd: FileHandle;
+	try {
+		fd = await open(file, "r");
+	} catch {
+		return undefined;
+	}
+	try {
+		const grew = prev !== undefined && st.size > prev.size;
+		const incremental = grew && (await stillAppendOnly(fd, prev!));
+		const start = incremental ? prev!.offset : 0;
+		const turns = incremental ? prev!.turns : [];
+		if (incremental) stats.incrementalParses++;
+		else stats.fullParses++;
+
+		const r = await scan(fd, start, st.size, chunkSize);
+		for (const t of r.turns) turns.push(t);
+		const tailTurn = r.rest.length > 0 ? turnFromLine(r.rest) : undefined;
+		return {
+			size: st.size,
+			mtimeMs: st.mtimeMs,
+			offset: r.consumed,
+			turns,
+			tail: tailTurn ? [tailTurn] : [],
+			head: incremental ? prev!.head : await bytesAt(fd, 0, Math.min(HEAD_BYTES, st.size)),
+			guard: await bytesAt(fd, Math.max(0, r.consumed - GUARD_BYTES), Math.min(GUARD_BYTES, r.consumed)),
+		};
+	} catch {
+		return undefined;
+	} finally {
+		await fd.close();
+	}
+}
+
+/** Size and mtime of a file, or undefined when it cannot be stat'ed. */
+export function fileStat(file: string): { size: number; mtimeMs: number } | undefined {
 	try {
 		const st = statSync(file);
-		return `${st.mtimeMs}:${st.size}`;
+		return { size: st.size, mtimeMs: st.mtimeMs };
 	} catch {
 		return undefined;
 	}
@@ -230,25 +361,31 @@ const emptyStats = (): PeriodStats => ({
 	sessions: 0,
 });
 
-/** Refresh the per-file cache and return every session file's parsed turns. */
-async function loadAll(sessionsRoot: string): Promise<Turn[][]> {
+/** Bring the per-file cache up to date (reading only what changed) and return every file's turns. */
+async function loadAll(sessionsRoot: string, chunkSize = CHUNK_BYTES): Promise<Turn[][]> {
 	const files = listSessionFiles(sessionsRoot);
 	const live = new Set(files);
 	for (const key of FILE_CACHE.keys()) if (!live.has(key)) FILE_CACHE.delete(key);
 
 	const out: Turn[][] = [];
 	for (const file of files) {
-		const sig = fileSignature(file);
-		if (sig === undefined) continue; // vanished between listing and stat
+		const st = fileStat(file);
+		if (st === undefined) continue; // vanished between listing and stat
 		let entry = FILE_CACHE.get(file);
-		if (!entry || entry.sig !== sig) {
-			entry = { sig, turns: await parseFile(file) };
-			FILE_CACHE.set(file, entry);
+		if (!entry || entry.size !== st.size || entry.mtimeMs !== st.mtimeMs) {
+			const fresh = await refreshEntry(file, st, entry, chunkSize);
+			if (fresh) FILE_CACHE.set(file, fresh);
+			else FILE_CACHE.delete(file);
+			entry = fresh;
 		}
-		out.push(entry.turns);
+		if (entry) out.push(entry.tail.length > 0 ? entry.turns.concat(entry.tail) : entry.turns);
 	}
 	return out;
 }
+
+/** Test hooks: parse with a tiny chunk size (chunk boundaries) / refresh one file directly. */
+export const __loadAllForTests = loadAll;
+export const __refreshEntryForTests = refreshEntry;
 
 const turnTokens = (t: Turn, includeCache: boolean) =>
 	t.input + t.output + (includeCache ? t.cacheRead + t.cacheWrite : 0);
@@ -518,6 +655,80 @@ export function isOverBudget(p: PeriodStats, b: { tokens?: number; cost?: number
 	return (b.tokens !== undefined && p.tokens > b.tokens) || (b.cost !== undefined && p.cost > b.cost);
 }
 
+// ---------------------------------------------------------------------------
+// Live refresh scheduling
+// ---------------------------------------------------------------------------
+
+export interface Timers {
+	set: (fn: () => void, ms: number) => unknown;
+	clear: (handle: unknown) => void;
+}
+
+const realTimers: Timers = {
+	set: (fn, ms) => setTimeout(fn, ms),
+	clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
+
+/**
+ * Runs `run` at most once per `delayMs` window however often `schedule()` is called
+ * (trailing edge), and never two runs at once: a request that arrives mid-run triggers one
+ * more run afterwards. A burst of 50 messages costs one refresh. Failures are swallowed;
+ * the timer never keeps the process alive.
+ */
+export function createCoalescer(
+	run: () => Promise<void>,
+	delayMs: number | (() => number),
+	timers: Timers = realTimers,
+) {
+	let timer: unknown;
+	let running = false;
+	let dirty = false;
+
+	const execute = async () => {
+		if (running) {
+			dirty = true;
+			return;
+		}
+		running = true;
+		try {
+			await run();
+		} catch {
+			/* a failed refresh must never surface */
+		} finally {
+			running = false;
+		}
+		if (dirty) {
+			dirty = false;
+			schedule();
+		}
+	};
+
+	const schedule = () => {
+		if (timer !== undefined) return; // one is already pending: coalesce
+		const ms = typeof delayMs === "function" ? delayMs() : delayMs;
+		timer = timers.set(() => {
+			timer = undefined;
+			void execute();
+		}, ms);
+		(timer as { unref?: () => void } | undefined)?.unref?.();
+	};
+
+	const cancel = () => {
+		if (timer !== undefined) timers.clear(timer);
+		timer = undefined;
+		dirty = false;
+	};
+
+	/** Run now (dropping any pending delayed run). */
+	const flush = () => {
+		if (timer !== undefined) timers.clear(timer);
+		timer = undefined;
+		return execute();
+	};
+
+	return { schedule, cancel, flush, isPending: () => timer !== undefined };
+}
+
 /** Map chart roles to pi theme colors. */
 export function themePaint(theme: { fg: (c: any, t: string) => string }): Paint {
 	const color: Record<string, string> = {
@@ -537,6 +748,12 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 
 	const updateUI = async (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) return;
+		if (!config.enabled) {
+			// Disabled: show nothing and read nothing.
+			ctx.ui.setStatus("tokenburn", "");
+			ctx.ui.setWidget("tokenburn-panel", []);
+			return;
+		}
 		const report = await collectUsage(getSessionsDir(), new Date(), config.includeCache);
 		const theme = ctx.ui.theme;
 
@@ -582,15 +799,43 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 		}
 	};
 
+	// The latest context, used by the (delayed) live refresh. Dropped at shutdown so a reloaded
+	// runtime never touches a stale one.
+	let latestCtx: ExtensionContext | undefined;
+	const refresher = createCoalescer(
+		async () => {
+			if (latestCtx && config.enabled) await updateUI(latestCtx);
+		},
+		() => config.refreshMs,
+	);
+
 	pi.on("session_start", async (_event, ctx) => {
+		latestCtx = ctx;
 		config = await loadConfig();
 		// A failing refresh must never break session start.
 		await updateUI(ctx).catch(() => {});
 	});
 
-	// Fire-and-forget: never block the agent loop on a stats refresh.
+	// Live: after each assistant message, coalesced. Never blocks, never throws into pi, and
+	// must return undefined (a message_end handler may otherwise replace the message).
+	pi.on("message_end", (event, ctx) => {
+		if (!config.enabled || !config.liveRefresh) return undefined;
+		if ((event.message as { role?: string } | undefined)?.role !== "assistant") return undefined;
+		latestCtx = ctx;
+		refresher.schedule();
+		return undefined;
+	});
+
+	// Final, exact refresh when a turn ends (fire-and-forget).
 	pi.on("turn_end", (_event, ctx) => {
-		void updateUI(ctx).catch(() => {});
+		if (!config.enabled) return;
+		latestCtx = ctx;
+		void refresher.flush();
+	});
+
+	pi.on("session_shutdown", () => {
+		refresher.cancel();
+		latestCtx = undefined;
 	});
 
 	pi.registerCommand("tokenburn", {
@@ -598,48 +843,76 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 		getArgumentCompletions: (prefix: string) => completions(prefix),
 		handler: async (args, ctx) => {
 			const cmd = parseCommand(args);
+			latestCtx = ctx;
 			const persist = async () => {
 				await saveConfig(config);
 				await updateUI(ctx);
 			};
+			// Settings changed while disabled are kept, but nothing shows until it is enabled.
+			const note = (msg: string) => ctx.ui.notify(config.enabled ? msg : `${msg} (tokenburn is disabled; /tokenburn enable to show it)`, "info");
 
 			switch (cmd.kind) {
 				case "window":
 					config.showWidget = !config.showWidget;
 					await persist();
-					ctx.ui.notify(`tokenburn widget: ${config.showWidget ? "enabled" : "hidden"}`, "info");
+					note(`tokenburn widget: ${config.showWidget ? "enabled" : "hidden"}`);
 					return;
 
 				case "status":
 					config.statusWindow = cmd.window;
 					await persist();
-					ctx.ui.notify(`tokenburn status window: ${cmd.window}`, "info");
+					note(`tokenburn status window: ${cmd.window}`);
 					return;
 
 				case "cycle": {
 					const next = STATUS_WINDOWS[(STATUS_WINDOWS.indexOf(config.statusWindow) + 1) % STATUS_WINDOWS.length];
 					config.statusWindow = next;
 					await persist();
-					ctx.ui.notify(`tokenburn status window: ${next}`, "info");
+					note(`tokenburn status window: ${next}`);
 					return;
 				}
 
 				case "cache":
 					config.includeCache = !config.includeCache;
 					await persist();
-					ctx.ui.notify(`tokenburn: cache tokens ${config.includeCache ? "included" : "excluded"}`, "info");
+					note(`tokenburn: cache tokens ${config.includeCache ? "included" : "excluded"}`);
 					return;
 
 				case "budget": {
 					const key = `${cmd.period}${cmd.isCost ? "Cost" : "Tokens"}` as keyof TokenBurnConfig["budgets"];
 					config.budgets[key] = cmd.amount;
 					await persist();
-					ctx.ui.notify(
-						`tokenburn ${cmd.period} budget: ${cmd.isCost ? formatCost(cmd.amount) : formatNum(cmd.amount) + " tokens"}`,
-						"info",
-					);
+					note(`tokenburn ${cmd.period} budget: ${cmd.isCost ? formatCost(cmd.amount) : formatNum(cmd.amount) + " tokens"}`);
 					return;
 				}
+
+				case "enable":
+					if (config.enabled) {
+						ctx.ui.notify("tokenburn is already enabled", "info");
+						return;
+					}
+					config.enabled = true;
+					await persist();
+					ctx.ui.notify("tokenburn enabled", "info");
+					return;
+
+				case "disable":
+					if (!config.enabled) {
+						ctx.ui.notify("tokenburn is already disabled", "info");
+						return;
+					}
+					config.enabled = false;
+					refresher.cancel();
+					await persist(); // clears the status line and the panel
+					ctx.ui.notify("tokenburn disabled: nothing runs in the background. /tokenburn enable turns it back on (charts still work on demand)", "info");
+					return;
+
+				case "live":
+					config.liveRefresh = !config.liveRefresh;
+					if (!config.liveRefresh) refresher.cancel();
+					await persist();
+					note(`tokenburn live refresh ${config.liveRefresh ? "on (after each assistant message)" : "off (only when a turn ends)"}`);
+					return;
 
 				case "invalid":
 					ctx.ui.notify(cmd.message, "warning");
@@ -705,11 +978,14 @@ export type Command =
 	| { kind: "cycle" }
 	| { kind: "window" }
 	| { kind: "cache" }
+	| { kind: "enable" }
+	| { kind: "disable" }
+	| { kind: "live" }
 	| { kind: "budget"; period: (typeof BUDGET_PERIODS)[number]; amount: number; isCost: boolean }
 	| { kind: "invalid"; message: string };
 
 export const USAGE =
-	"Usage: /tokenburn [day|week|month|year|all] (status-bar period) · chart [day|week|month|year|all] · status <today|week|month|year|total> · cycle · window · budget <day|week|month> <tokens|$cost> · cache";
+	"Usage: /tokenburn [day|week|month|year|all] (status-bar period) · chart [day|week|month|year|all] · status <today|week|month|year|total> · cycle · window · budget <day|week|month> <tokens|$cost> · cache · live · enable · disable";
 
 /** Words that pick the status-bar period: `day` shows today, `all` shows the all-time total. */
 const WORD_TO_WINDOW: Record<string, Window> = {
@@ -752,6 +1028,14 @@ export function parseCommand(args: string | undefined): Command {
 			return { kind: "window" };
 		case "cache":
 			return { kind: "cache" };
+		case "enable":
+		case "on":
+			return { kind: "enable" };
+		case "disable":
+		case "off":
+			return { kind: "disable" };
+		case "live":
+			return { kind: "live" };
 		case "budget": {
 			const isCost = (p2 ?? "").startsWith("$");
 			const amount = Number((p2 ?? "").replace(/^\$/, ""));
@@ -792,6 +1076,9 @@ const TOP_LEVEL: CompletionItem[] = [
 	{ value: "window", label: "window", description: "Toggle the panel below the editor" },
 	{ value: "budget ", label: "budget", description: "Set a day/week/month budget" },
 	{ value: "cache", label: "cache", description: "Toggle counting cache tokens" },
+	{ value: "live", label: "live", description: "Toggle refreshing after each message" },
+	{ value: "enable", label: "enable", description: "Turn tokenburn on (status line, panel, refresh)" },
+	{ value: "disable", label: "disable", description: "Turn tokenburn off: nothing runs in the background" },
 ];
 
 /** `prefix` is the whole argument text typed so far (pi replaces it with `value`). */

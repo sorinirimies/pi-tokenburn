@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tokenBurn, { clearCache, fileSignature, resolveAgentDir, resolveSessionsDir, sanitizeBudgets } from "../extensions/tokenburn.ts";
+import tokenBurn, { clearCache, fileStat, resolveAgentDir, resolveSessionsDir, sanitizeBudgets } from "../extensions/tokenburn.ts";
 
 describe("path resolution", () => {
 	it("resolveAgentDir: PI_CODING_AGENT_DIR, then XDG, then ~/.pi/agent", () => {
@@ -19,11 +19,13 @@ describe("path resolution", () => {
 		expect(resolveSessionsDir({}, "/h")).toBe(join("/h", ".pi", "agent", "sessions"));
 	});
 
-	it("fileSignature is mtime:size, or undefined for a missing file", () => {
+	it("fileStat is size + mtime, or undefined for a missing file", () => {
 		const d = mkdtempSync(join(tmpdir(), "pi-tb-sig-"));
 		writeFileSync(join(d, "f"), "abc");
-		expect(fileSignature(join(d, "f"))).toMatch(/^\d+(\.\d+)?:3$/);
-		expect(fileSignature(join(d, "nope"))).toBeUndefined();
+		const st = fileStat(join(d, "f"))!;
+		expect(st.size).toBe(3);
+		expect(st.mtimeMs).toBeGreaterThan(0);
+		expect(fileStat(join(d, "nope"))).toBeUndefined();
 		rmSync(d, { recursive: true, force: true });
 	});
 });

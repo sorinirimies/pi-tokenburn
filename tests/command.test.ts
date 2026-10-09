@@ -45,6 +45,15 @@ describe("parseCommand", () => {
 		expect(parseCommand("status all").kind).toBe("invalid");
 	});
 
+	it("parses enable / disable (and the on / off aliases) and live", () => {
+		expect(parseCommand("enable")).toEqual({ kind: "enable" });
+		expect(parseCommand("on")).toEqual({ kind: "enable" });
+		expect(parseCommand("disable")).toEqual({ kind: "disable" });
+		expect(parseCommand("off")).toEqual({ kind: "disable" });
+		expect(parseCommand(" DISABLE ")).toEqual({ kind: "disable" });
+		expect(parseCommand("live")).toEqual({ kind: "live" });
+	});
+
 	it("parses cycle / window / widget / cache", () => {
 		expect(parseCommand("cycle")).toEqual({ kind: "cycle" });
 		expect(parseCommand("window")).toEqual({ kind: "window" });
@@ -83,7 +92,7 @@ describe("completions", () => {
 
 	it("offers day, week, month, year, all, chart and the rest at the top level", () => {
 		const values = completions("")!.map((i) => i.value.trim());
-		for (const v of ["day", "week", "month", "year", "all", "chart", "status", "cycle", "window", "budget", "cache"]) {
+		for (const v of ["day", "week", "month", "year", "all", "chart", "status", "cycle", "window", "budget", "cache", "live", "enable", "disable"]) {
 			expect(values).toContain(v);
 		}
 	});
@@ -92,6 +101,9 @@ describe("completions", () => {
 		expect(completions("mo")!.map((i) => i.value)).toEqual(["month"]);
 		expect(completions("y")!.map((i) => i.value)).toEqual(["year"]);
 		expect(completions("ch")!.map((i) => i.value)).toEqual(["chart "]);
+		expect(completions("e")!.map((i) => i.value)).toEqual(["enable"]);
+		expect(completions("d")!.map((i) => i.value)).toEqual(["day", "disable"]);
+		expect(completions("li")!.map((i) => i.value)).toEqual(["live"]);
 		expect(completions("zzz")).toBeNull();
 	});
 

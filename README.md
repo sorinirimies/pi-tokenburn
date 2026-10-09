@@ -13,6 +13,7 @@ Totals match the `tokenburn` CLI exactly.
 - **Status line:** `/tokenburn day|week|month|year|all` (or `cycle`) changes the period shown at the bottom. Charts live under `/tokenburn chart <view>`.
 - **Window panel (optional):** Today / Week / Month / Total below the editor, with in/out tokens and cost.
 - **Budgets** per day, week and month, in tokens and/or dollars.
+- **Live:** the bottom line updates after every assistant message, not only when a turn ends, at no measurable cost (see Performance).
 - **Fast:** per-file cache keyed on mtime+size. First scan of ~400 MB of sessions takes under a second; refreshes after that take milliseconds. Refresh never blocks the agent loop.
 
 ## Install
@@ -36,6 +37,9 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 | `/tokenburn budget <day\|week\|month> <tokens>` | Token budget, e.g. `budget day 5000000` |
 | `/tokenburn budget <day\|week\|month> $<cost>` | Dollar budget, e.g. `budget week $50` |
 | `/tokenburn cache` | Toggle counting cache read/write tokens |
+| `/tokenburn live` | Toggle refreshing after each assistant message (on by default) |
+| `/tokenburn disable` (`off`) | Turn tokenburn off: status line and panel cleared, **nothing runs in the background**. `chart` still works on demand |
+| `/tokenburn enable` (`on`) | Turn it back on. Both are remembered across sessions |
 
 Tab-completion works for all of these. Unknown input prints usage instead of failing. `report <view>` is kept as an alias of `chart <view>`.
 
@@ -63,6 +67,9 @@ Weeks start on Monday, in local time.
 
 ```json
 {
+  "enabled": true,
+  "liveRefresh": true,
+  "refreshMs": 750,
   "includeCache": true,
   "chartColor": true,
   "showStatus": true,
@@ -74,9 +81,20 @@ Weeks start on Monday, in local time.
 
 - `includeCache` (default `true`): count cache read/write tokens in totals, like the `tokenburn` CLI. Cache reads dominate (often 95%+ of tokens) but are billed far cheaper; set `false` to budget on input + output only.
 
+- `enabled` (default `true`): master switch, same as `/tokenburn enable|disable`.
+- `liveRefresh` (default `true`): refresh after each assistant message. `false` = only when a turn ends. `refreshMs` (default `750`, range 250 to 60000) is the coalescing delay.
 - `chartColor` (default `true`): color the chart using your pi theme (current period green, over-budget red, budget line yellow). Set `false` for plain text.
 
 Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CODING_AGENT_SESSION_DIR`, `PI_CODING_AGENT_DIR`.
+
+## Performance
+
+Refreshing is designed to cost nothing you can notice:
+
+- **Incremental:** pi's session logs are append-only, so after the first parse only the bytes added since then are read (with a cheap integrity check that falls back to a full parse if a file was rewritten or truncated). On a 35 MB active session a refresh after one new message takes **~1.2 ms**, down from ~18 ms, and the cost no longer grows with the session.
+- **Coalesced:** a burst of messages triggers one refresh (trailing delay, `refreshMs`), never two at once.
+- **Never blocks:** refreshes are fire-and-forget and errors are swallowed; the timer is unref'd and cancelled at shutdown.
+- **Off means off:** `/tokenburn disable` (or `"enabled": false`) reads no files and starts no timers.
 
 ## Security notes
 

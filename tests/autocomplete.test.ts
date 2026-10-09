@@ -14,6 +14,7 @@ const TYPED = [
 	"b", "budget", "budget ", "budget d", "budget w", "budget m", "budget day",
 	"r", "report", "report ", "report d", "report w", "report m", "report y", "report a",
 	"ch", "chart", "chart ", "chart d", "chart w", "chart m", "chart y", "chart a", "chart all", "chart zzz",
+	"e", "en", "enable", "di", "disable", "l", "li", "live", "on", "off",
 	"zzz", "status zzz", "budget day ", "budget day 5", "report week ",
 ];
 
@@ -117,7 +118,7 @@ describe("pi's real autocomplete provider × the tokenburn command", () => {
 		const s = await suggest("/tokenburn ");
 		const labels = s!.items.map((i) => i.label);
 		expect(labels.slice(0, 5)).toEqual(["day", "week", "month", "year", "all"]);
-		for (const l of ["chart", "status", "cycle", "window", "budget", "cache"]) expect(labels).toContain(l);
+		for (const l of ["chart", "status", "cycle", "window", "budget", "cache", "live", "enable", "disable"]) expect(labels).toContain(l);
 		for (const i of s!.items) expect(i.description && i.description.length).toBeGreaterThan(3);
 	});
 
