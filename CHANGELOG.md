@@ -3,6 +3,26 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.1) — 2026-10-09
+
+
+### 🐛 Fixes
+
+- **report:** Shorter footer hint that fits a narrow terminal; docs: re-record the demos on a smaller canvas with larger text and small, believable numbers (fixture, mock model, budgets, README chart example) ([`92b66d1`](https://github.com/sorinirimies/pi-tokenburn/commit/92b66d1cdb59c5d4c954750935900086b3a82385))
+
+### 📚 Docs
+
+- VHS demo recordings of the real plugin in real pi (synthetic data, mock model) tracked with Git LFS; just vhs-*/demo; tests keep tapes, README and fixture honest ([`2c12999`](https://github.com/sorinirimies/pi-tokenburn/commit/2c12999a597e3c24d7151b324f277a9512cbc8fd))
+- README badges, related plugins and the new automatic release flow ([`16f12ce`](https://github.com/sorinirimies/pi-tokenburn/commit/16f12cec63dcce237e20210e050cd0711b8849cc))
+
+### 🧪 Tests
+
+- Windows-safe line endings for tapes and scripts (.gitattributes eol=lf) ([`b44185b`](https://github.com/sorinirimies/pi-tokenburn/commit/b44185bfec8326a55604845093558c55eb2d8136))
+
+### 🔧 Build & CI
+
+- Auto-merge library updates only after CI is green, and publish a patch automatically (any library update ships; major updates wait for review) ([`d8a2840`](https://github.com/sorinirimies/pi-tokenburn/commit/d8a2840862254971341d220bfd32aa5139def809))
+- **deps:** Bump actions/setup-node from 4.4.0 to 7.0.0 ([`2345ec3`](https://github.com/sorinirimies/pi-tokenburn/commit/2345ec36c9b5927ebf674a50fa93396d1c31da10))
 ## [0.5.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.0) — 2026-10-09
 
 
