@@ -3,6 +3,12 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.0) — 2026-10-09
+
+
+### ✨ Features
+
+- Live status-line refresh after each assistant message (incremental parsing, coalesced, ~1.3 ms), /tokenburn enable|disable|live, refreshMs config ([`7fed0c1`](https://github.com/sorinirimies/pi-tokenburn/commit/7fed0c1e2e0ae4ed2879196a549f1f398aac71e3))
 ## [0.4.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.4.0) — 2026-10-09
 
 
