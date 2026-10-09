@@ -761,13 +761,14 @@ const TOP_LEVEL: CompletionItem[] = [
 /** `prefix` is the whole argument text typed so far (pi replaces it with `value`). */
 export function completions(prefix: string): CompletionItem[] | null {
 	const text = (prefix ?? "").toLowerCase().replace(/^\s+/, "");
-	const sub = (head: string, words: readonly string[], desc: (w: string) => string): CompletionItem[] =>
-		words.map((w) => ({ value: `${head} ${w}`, label: w, description: desc(w) }));
+	// `tail` = " " when the completed text still needs another word (a budget amount).
+	const sub = (head: string, words: readonly string[], desc: (w: string) => string, tail = ""): CompletionItem[] =>
+		words.map((w) => ({ value: `${head} ${w}${tail}`, label: w, description: desc(w) }));
 
 	let pool: CompletionItem[];
 	if (text.startsWith("status ")) pool = sub("status", STATUS_WINDOWS, (w) => `Show ${w} in the status bar`);
 	else if (text.startsWith("budget ") && !/^budget \S+ /.test(text))
-		pool = sub("budget", BUDGET_PERIODS, (w) => `Set the ${w} budget (tokens or $cost)`);
+		pool = sub("budget", BUDGET_PERIODS, (w) => `Set the ${w} budget (tokens or $cost)`, " ");
 	else if (/^(report|chart) /.test(text)) {
 		const head = text.split(" ")[0];
 		pool = sub(head, REPORT_VIEWS, (w) => `${head} for ${w}`);

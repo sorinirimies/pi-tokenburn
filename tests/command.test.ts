@@ -90,7 +90,8 @@ describe("completions", () => {
 			"status today", "status week", "status month", "status year", "status total",
 		]);
 		expect(completions("status y")!.map((i) => i.value)).toEqual(["status year"]);
-		expect(completions("budget ")!.map((i) => i.value)).toEqual(["budget day", "budget week", "budget month"]);
+		expect(completions("budget ")!.map((i) => i.value)).toEqual(["budget day ", "budget week ", "budget month "]);
+		expect(completions("budget w")!.map((i) => i.value)).toEqual(["budget week "]);
 		expect(completions("report a")!.map((i) => i.value)).toEqual(["report all"]);
 	});
 
