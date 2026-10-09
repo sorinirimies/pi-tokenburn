@@ -6,6 +6,8 @@ TypeScript port of the pi collector from [tokenburn](https://github.com/soriniri
 Reads Pi's local session logs (`~/.pi/agent/sessions/**/*.jsonl`). **No network, zero prompt tokens.**
 Totals match the `tokenburn` CLI exactly.
 
+<img src="examples/vhs/generated/overview.gif" alt="pi-tokenburn: the live footer counter, a report with a daily chart, switching the footer period and a weekly chart" width="900">
+
 ## Features
 
 - **Status bar:** `🔥 1.20M ($52.79) [today]`, turns red with `OVER BUDGET` past your limit.
@@ -40,6 +42,34 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 | `/tokenburn live` | Toggle refreshing after each assistant message (on by default) |
 | `/tokenburn disable` (`off`) | Turn tokenburn off: status line and panel cleared, **nothing runs in the background**. `chart` still works on demand |
 | `/tokenburn enable` (`on`) | Turn it back on. Both are remembered across sessions |
+
+### Previews
+
+Recorded from a real pi with only this plugin loaded, on synthetic data.
+
+**Switch what the bottom line shows** (`/tokenburn day|week|month|year|all`, or `cycle`):
+
+![Status line: week, month, year, all, day, then cycle](examples/vhs/generated/status.gif)
+
+**Charts** (`/tokenburn chart day|week|month|year|all`): the current period is green, with a peak and average footer:
+
+![Charts: day, week, month, year and all-time](examples/vhs/generated/charts.gif)
+
+**Budgets** (`/tokenburn budget day 8000000`, `budget week $25`): the footer turns red past the limit, and the chart draws the budget line with over-budget columns in red:
+
+![Budgets: OVER BUDGET in the footer and red columns in the chart](examples/vhs/generated/budget.gif)
+
+**Live refresh:** the footer updates after every assistant message, not only when a turn ends (here a local mock model answers; pi writes the turn to its session log and the counter moves by itself):
+
+![Live refresh: the counter and cost tick up as the reply lands](examples/vhs/generated/live-refresh.gif)
+
+**Enable / disable:** off means off (nothing runs in the background), and charts still work on demand:
+
+![Disable clears the footer, a chart still works, enable brings it back](examples/vhs/generated/enable-disable.gif)
+
+**Tab-completion** uses pi's own menu, with a description for every option:
+
+![Autocomplete for /tokenburn and its chart sub-menu](examples/vhs/generated/completion.gif)
 
 Tab-completion works for all of these. Unknown input prints usage instead of failing. `report <view>` is kept as an alias of `chart <view>`.
 
@@ -95,6 +125,17 @@ Refreshing is designed to cost nothing you can notice:
 - **Coalesced:** a burst of messages triggers one refresh (trailing delay, `refreshMs`), never two at once.
 - **Never blocks:** refreshes are fire-and-forget and errors are swallowed; the timer is unref'd and cancelled at shutdown.
 - **Off means off:** `/tokenburn disable` (or `"enabled": false`) reads no files and starts no timers.
+
+## Demo recordings
+
+The GIFs above live in [`examples/vhs/generated/`](examples/vhs/generated) and are stored with **Git LFS** (`git lfs install` once). They are recorded with [VHS](https://github.com/charmbracelet/vhs) from a **real pi** that loads only this extension, on synthetic data (`examples/vhs/fixture.sh`: 900 days of made-up sessions in `/tmp`, a local mock model), never from real logs, paths or credentials:
+
+```sh
+just vhs-all          # every tape (examples/vhs/*.tape): needs vhs, ttyd, ffmpeg, pi, bun, python3
+just vhs-tape charts  # one tape
+just vhs-list         # list the tapes
+just demo             # try it yourself in a real pi on the same synthetic data
+```
 
 ## Security notes
 

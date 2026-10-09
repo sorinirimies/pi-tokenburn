@@ -27,8 +27,8 @@ function readmeCommands(): string[] {
 		}
 		// bare `a|b|c` after the command name
 		variants = variants.flatMap((v) => {
-			const m = v.match(/^\/tokenburn (\w+(?:\|\w+)+)$/);
-			return m ? m[1].split("|").map((alt) => `/tokenburn ${alt}`) : [v];
+			const m = v.match(/^\/tokenburn ((?:\w+ )?)(\w+(?:\|\w+)+)$/); // `a|b|c` or `word a|b|c`
+			return m ? m[2].split("|").map((alt) => `/tokenburn ${m[1]}${alt}`) : [v];
 		});
 		// named placeholders
 		for (const [ph, values] of Object.entries(PLACEHOLDERS)) {

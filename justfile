@@ -16,6 +16,15 @@ _check-bun:
 _check-git-cliff:
     @command -v git-cliff >/dev/null 2>&1 || { echo "❌ git-cliff not found. Install with: cargo install git-cliff --locked"; exit 1; }
 
+_check-vhs:
+    @command -v vhs >/dev/null 2>&1 || { \
+        echo "❌ vhs not found."; \
+        echo "   macOS:      brew install vhs"; \
+        echo "   Any:        go install github.com/charmbracelet/vhs@latest"; \
+        exit 1; \
+    }
+    @command -v pi >/dev/null 2>&1 || { echo "❌ pi not found (the demos record the real pi)."; exit 1; }
+
 # Install dependencies
 install: _check-bun
     bun install
@@ -99,3 +108,46 @@ publish-dry: check
 # Publish locally (needs `npm login` + OTP). CI normally does this on a tag.
 publish: check
     npm publish --access public
+
+# ── VHS demo GIFs ─────────────────────────────────────────────────────────────
+
+VHS := "examples/vhs"
+VHS_GENERATED := "examples/vhs/generated"
+
+# Record every demo GIF (a real pi with only this plugin, on synthetic data; needs vhs, ttyd, ffmpeg, pi, bun, python3)
+vhs-all: _check-vhs _check-bun
+    #!/usr/bin/env sh
+    set -e
+    mkdir -p {{ VHS_GENERATED }}
+    echo "╔════════════════════════════════════════════╗"
+    echo "║   Tapes (pi-tokenburn, VHS)               ║"
+    echo "╚════════════════════════════════════════════╝"
+    for tape in {{ VHS }}/*.tape; do
+        [ -f "$tape" ] || continue
+        echo "▶  $tape"
+        vhs "$tape" || echo "❌ Failed: $tape"
+    done
+    echo "✅ Demos done → {{ VHS_GENERATED }}/  (tracked with Git LFS: git lfs install once)"
+
+# Render a single tape by name (e.g. just vhs-tape charts)
+vhs-tape name: _check-vhs _check-bun
+    #!/usr/bin/env sh
+    if [ -f "{{ VHS }}/{{ name }}.tape" ]; then
+        vhs "{{ VHS }}/{{ name }}.tape" && echo "✅ Done."
+    else
+        echo "❌ Tape not found: {{ name }}.tape"
+        just vhs-list
+        exit 1
+    fi
+
+# List all VHS tapes
+vhs-list:
+    @ls {{ VHS }}/*.tape | sed 's|.*/||; s|\.tape||' | sed 's/^/  /'
+
+# Try the plugin yourself in a real pi on the synthetic demo data (never touches your real sessions)
+demo: _check-vhs
+    #!/usr/bin/env sh
+    set -e
+    bash {{ VHS }}/fixture.sh
+    eval "$(bash {{ VHS }}/fixture.sh env)"
+    bash {{ VHS }}/pi-demo.sh

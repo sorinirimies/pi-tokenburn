@@ -19,7 +19,7 @@ export def required_files [pkg: record]: nothing -> list {
 }
 
 # Paths that must never ship.
-const NEVER_SHIP = ["tests/" "scripts/" ".github/" ".gitea/" "node_modules/"]
+const NEVER_SHIP = ["tests/" "scripts/" "examples/" ".github/" ".gitea/" "node_modules/"]
 
 export def forbidden [paths: list]: nothing -> list {
     $paths | where {|p| $NEVER_SHIP | any {|prefix| $p | str starts-with $prefix } }

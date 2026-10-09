@@ -20,8 +20,8 @@ def "test quality_gate: the repo own manifest is covered" [] {
 }
 
 def "test quality_gate: tests, scripts, CI and node_modules must not ship" [] {
-    let bad = (forbidden ["extensions/a.ts" "tests/a.test.ts" "scripts/x.nu" ".github/workflows/ci.yml" ".gitea/workflows/ci.yml" "node_modules/x/index.js" "README.md"])
-    assert equal $bad ["tests/a.test.ts" "scripts/x.nu" ".github/workflows/ci.yml" ".gitea/workflows/ci.yml" "node_modules/x/index.js"]
+    let bad = (forbidden ["extensions/a.ts" "tests/a.test.ts" "scripts/x.nu" "examples/vhs/overview.tape" "examples/vhs/generated/a.gif" ".github/workflows/ci.yml" ".gitea/workflows/ci.yml" "node_modules/x/index.js" "README.md"])
+    assert equal $bad ["tests/a.test.ts" "scripts/x.nu" "examples/vhs/overview.tape" "examples/vhs/generated/a.gif" ".github/workflows/ci.yml" ".gitea/workflows/ci.yml" "node_modules/x/index.js"]
 }
 
 def "test quality_gate: a clean file list has nothing forbidden" [] {
