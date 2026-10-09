@@ -50,6 +50,8 @@ export interface TokenBurnReport {
 export interface TokenBurnConfig {
 	/** Count cache read/write tokens in totals (matches the tokenburn CLI). */
 	includeCache: boolean;
+	/** Color the report chart (set false if your terminal garbles ANSI in notifications). */
+	chartColor: boolean;
 	showStatus: boolean;
 	showWidget: boolean;
 	statusWindow: "today" | "week" | "month" | "total";
@@ -65,6 +67,7 @@ export interface TokenBurnConfig {
 
 const DEFAULT_CONFIG: TokenBurnConfig = {
 	includeCache: true,
+	chartColor: true,
 	showStatus: true,
 	showWidget: false,
 	statusWindow: "today",
@@ -89,6 +92,7 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 		const parsed = JSON.parse(raw);
 		return {
 			includeCache: typeof parsed.includeCache === "boolean" ? parsed.includeCache : DEFAULT_CONFIG.includeCache,
+			chartColor: typeof parsed.chartColor === "boolean" ? parsed.chartColor : DEFAULT_CONFIG.chartColor,
 			showStatus: typeof parsed.showStatus === "boolean" ? parsed.showStatus : DEFAULT_CONFIG.showStatus,
 			showWidget: typeof parsed.showWidget === "boolean" ? parsed.showWidget : DEFAULT_CONFIG.showWidget,
 			statusWindow: ["today", "week", "month", "total"].includes(parsed.statusWindow)
@@ -188,36 +192,13 @@ const emptyStats = (): PeriodStats => ({
 	sessions: 0,
 });
 
-export async function collectUsage(
-	sessionsRoot: string,
-	now: Date = new Date(),
-	includeCache = true,
-): Promise<TokenBurnReport> {
-	const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-	const dayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
-	const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
-	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-	const report: TokenBurnReport = {
-		today: emptyStats(),
-		week: emptyStats(),
-		month: emptyStats(),
-		total: emptyStats(),
-	};
-
+/** Refresh the per-file cache and return every session file's parsed turns. */
+async function loadAll(sessionsRoot: string): Promise<Turn[][]> {
 	const files = listSessionFiles(sessionsRoot);
 	const live = new Set(files);
 	for (const key of FILE_CACHE.keys()) if (!live.has(key)) FILE_CACHE.delete(key);
 
-	const add = (p: PeriodStats, t: Turn) => {
-		p.tokens += t.input + t.output + (includeCache ? t.cacheRead + t.cacheWrite : 0);
-		p.input += t.input;
-		p.output += t.output;
-		p.cacheRead += t.cacheRead;
-		p.cacheWrite += t.cacheWrite;
-		p.cost += t.cost;
-	};
-
+	const out: Turn[][] = [];
 	for (const file of files) {
 		let sig: string;
 		try {
@@ -231,22 +212,230 @@ export async function collectUsage(
 			entry = { sig, turns: await parseFile(file) };
 			FILE_CACHE.set(file, entry);
 		}
+		out.push(entry.turns);
+	}
+	return out;
+}
 
+const turnTokens = (t: Turn, includeCache: boolean) =>
+	t.input + t.output + (includeCache ? t.cacheRead + t.cacheWrite : 0);
+
+export async function collectUsage(
+	sessionsRoot: string,
+	now: Date = new Date(),
+	includeCache = true,
+): Promise<TokenBurnReport> {
+	const startOfDay = bucketStart(now.getTime(), "day");
+	const startOfWeek = bucketStart(now.getTime(), "week");
+	const startOfMonth = bucketStart(now.getTime(), "month");
+
+	const report: TokenBurnReport = {
+		today: emptyStats(),
+		week: emptyStats(),
+		month: emptyStats(),
+		total: emptyStats(),
+	};
+
+	const add = (p: PeriodStats, t: Turn) => {
+		p.tokens += turnTokens(t, includeCache);
+		p.input += t.input;
+		p.output += t.output;
+		p.cacheRead += t.cacheRead;
+		p.cacheWrite += t.cacheWrite;
+		p.cost += t.cost;
+	};
+
+	for (const turns of await loadAll(sessionsRoot)) {
 		let maxTs = 0;
-		for (const t of entry.turns) {
+		for (const t of turns) {
 			if (t.ts > maxTs) maxTs = t.ts;
 			add(report.total, t);
 			if (t.ts >= startOfMonth) add(report.month, t);
 			if (t.ts >= startOfWeek) add(report.week, t);
 			if (t.ts >= startOfDay) add(report.today, t);
 		}
-		if (entry.turns.length > 0) report.total.sessions++;
+		if (turns.length > 0) report.total.sessions++;
 		if (maxTs >= startOfMonth) report.month.sessions++;
 		if (maxTs >= startOfWeek) report.week.sessions++;
 		if (maxTs >= startOfDay) report.today.sessions++;
 	}
 
 	return report;
+}
+
+// ---------------------------------------------------------------------------
+// Time series + chart
+// ---------------------------------------------------------------------------
+
+export type Unit = "day" | "week" | "month";
+
+/** Local-time start of the day / Monday-week / month containing `ts`. */
+export function bucketStart(ts: number, unit: Unit): number {
+	const d = new Date(ts);
+	if (unit === "day") return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+	if (unit === "week") {
+		const dow = (d.getDay() + 6) % 7; // Monday = 0
+		return new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow).getTime();
+	}
+	return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+export function bucketLabel(start: number, unit: Unit): string {
+	const d = new Date(start);
+	if (unit === "month") return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+	const base = `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+	return unit === "day" ? `${base} ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]}` : `${base} wk`;
+}
+
+export interface SeriesPoint {
+	start: number;
+	label: string;
+	tokens: number;
+	cost: number;
+}
+
+export const DEFAULT_COUNT: Record<Unit, number> = { day: 14, week: 8, month: 6 };
+
+/** Last `count` buckets ending at `now`, oldest first, empty buckets zero-filled. */
+export async function collectSeries(
+	sessionsRoot: string,
+	unit: Unit,
+	count = DEFAULT_COUNT[unit],
+	now: Date = new Date(),
+	includeCache = true,
+): Promise<SeriesPoint[]> {
+	const starts: number[] = [];
+	for (let i = count - 1; i >= 0; i--) {
+		const y = now.getFullYear();
+		const m = now.getMonth();
+		const day = now.getDate();
+		const anchor =
+			unit === "day"
+				? new Date(y, m, day - i)
+				: unit === "week"
+					? new Date(y, m, day - i * 7)
+					: new Date(y, m - i, 1);
+		starts.push(bucketStart(anchor.getTime(), unit));
+	}
+	const points = new Map<number, SeriesPoint>(
+		starts.map((start) => [start, { start, label: bucketLabel(start, unit), tokens: 0, cost: 0 }]),
+	);
+	for (const turns of await loadAll(sessionsRoot)) {
+		for (const t of turns) {
+			const pt = points.get(bucketStart(t.ts, unit));
+			if (!pt) continue;
+			pt.tokens += turnTokens(t, includeCache);
+			pt.cost += t.cost;
+		}
+	}
+	return starts.map((s) => points.get(s)!);
+}
+
+const EIGHTHS = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"];
+const SPARK = "▁▂▃▄▅▆▇█";
+
+/** Horizontal bar of `value/max` over `width` cells, with 1/8-cell precision. */
+export function bar(value: number, max: number, width: number): string {
+	if (max <= 0 || value <= 0) return "";
+	const eighths = Math.max(1, Math.round((value / max) * width * 8));
+	const full = Math.floor(eighths / 8);
+	return "█".repeat(full) + EIGHTHS[eighths % 8];
+}
+
+export function sparkline(values: number[]): string {
+	const max = Math.max(...values, 0);
+	if (max <= 0) return SPARK[0].repeat(values.length);
+	return values.map((v) => SPARK[Math.min(7, Math.round((v / max) * 7))]).join("");
+}
+
+const UNIT_TITLE: Record<Unit, string> = { day: "Daily", week: "Weekly", month: "Monthly" };
+const UNIT_NOUN: Record<Unit, string> = { day: "day", week: "week", month: "month" };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export type Paint = (kind: "bar" | "now" | "over" | "axis" | "budget" | "dim" | "title", text: string) => string;
+const plain: Paint = (_k, t) => t;
+
+/** Two header rows for a column: [top, bottom]. */
+function columnLabels(p: SeriesPoint, unit: Unit): [string, string] {
+	const d = new Date(p.start);
+	if (unit === "day") return [pad2(d.getDate()), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d.getDay()]];
+	if (unit === "week") return [`${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, "wk"];
+	return [MONTHS[d.getMonth()], String(d.getFullYear())];
+}
+
+/**
+ * Vertical column chart: y-axis, 1/8-row precision, optional budget line,
+ * highlighted current bucket and over-budget columns, summary footer.
+ */
+export function renderChart(
+	series: SeriesPoint[],
+	unit: Unit,
+	opts: { height?: number; budget?: { tokens?: number; cost?: number }; paint?: Paint } = {},
+): string[] {
+	const paint = opts.paint ?? plain;
+	const height = opts.height ?? 8;
+	const colW = unit === "day" ? 3 : 6; // bar cells + 1 gap
+	const barW = colW - 1;
+
+	const peakPoint = series.reduce((m, p) => (p.tokens > m.tokens ? p : m), series[0]);
+	const dataMax = peakPoint?.tokens ?? 0;
+	const budgetTokens = opts.budget?.tokens;
+	const scaleMax = Math.max(dataMax, budgetTokens ?? 0);
+	const total = series.reduce((a, p) => a + p.tokens, 0);
+	const totalCost = series.reduce((a, p) => a + p.cost, 0);
+
+	const yLabels = [formatNum(scaleMax), formatNum(scaleMax / 2), "0"];
+	const yW = Math.max(...yLabels.map((l) => l.length)) + 1;
+	const labelFor = (row: number) => (row === height ? yLabels[0] : row === Math.ceil(height / 2) ? yLabels[1] : "");
+	const budgetRow = budgetTokens && scaleMax > 0 ? Math.max(1, Math.ceil((budgetTokens / scaleMax) * height)) : 0;
+
+	const isOver = (p: SeriesPoint) =>
+		opts.budget ? isOverBudget({ tokens: p.tokens, cost: p.cost } as PeriodStats, opts.budget) : false;
+	const kindOf = (i: number): "bar" | "now" | "over" =>
+		isOver(series[i]) ? "over" : i === series.length - 1 ? "now" : "bar";
+
+	const lines: string[] = [];
+	lines.push(
+		paint("title", `${UNIT_TITLE[unit]} tokens`) +
+			paint("dim", ` · last ${series.length} ${UNIT_NOUN[unit]}s`) +
+			(budgetTokens ? paint("budget", `  ┄ budget ${formatNum(budgetTokens)}`) : ""),
+	);
+
+	for (let row = height; row >= 1; row--) {
+		let line = paint("axis", `${labelFor(row).padStart(yW)} │`);
+		for (let i = 0; i < series.length; i++) {
+			const h = scaleMax > 0 ? (series[i].tokens / scaleMax) * height : 0;
+			let cell: string;
+			if (h >= row) cell = "█";
+			else if (h > row - 1 && series[i].tokens > 0) cell = SPARK[Math.min(7, Math.max(0, Math.floor((h - (row - 1)) * 8) - 1))];
+			else if (row === 1 && series[i].tokens > 0) cell = "▁";
+			else cell = row === budgetRow ? "┄" : " ";
+			const filled = cell !== " " && cell !== "┄";
+			const body = cell.repeat(barW);
+			line += filled ? paint(kindOf(i), body) : cell === "┄" ? paint("budget", body) : body;
+			line += row === budgetRow ? paint("budget", "┄") : " ";
+		}
+		lines.push(line);
+	}
+
+	lines.push(paint("axis", `${"".padStart(yW)} └${"─".repeat(series.length * colW)}`));
+	const pad = " ".repeat(yW + 2);
+	const cols = series.map((p, i) => ({ l: columnLabels(p, unit), now: i === series.length - 1 }));
+	lines.push(pad + cols.map((c) => c.l[0].padEnd(colW)).join(""));
+	lines.push(paint("dim", pad + cols.map((c) => c.l[1].padEnd(colW)).join("")));
+	lines.push(pad + cols.map((c) => (c.now ? paint("now", "▲".padEnd(colW)) : " ".repeat(colW))).join(""));
+
+	const avg = series.length ? total / series.length : 0;
+	lines.push(
+		paint(
+			"dim",
+			`Σ ${formatNum(total)} (${formatCost(totalCost)}) · avg ${formatNum(avg)}/${UNIT_NOUN[unit]}` +
+				(dataMax > 0 ? ` · peak ${formatNum(dataMax)} (${bucketLabel(peakPoint.start, unit)})` : ""),
+		),
+	);
+	return lines;
 }
 
 /** Clear the per-file cache (tests). */
@@ -266,6 +455,20 @@ export function budgetsFor(cfg: TokenBurnConfig, w: Window): { tokens?: number; 
 
 export function isOverBudget(p: PeriodStats, b: { tokens?: number; cost?: number }): boolean {
 	return (b.tokens !== undefined && p.tokens > b.tokens) || (b.cost !== undefined && p.cost > b.cost);
+}
+
+/** Map chart roles to pi theme colors. */
+export function themePaint(theme: { fg: (c: any, t: string) => string }): Paint {
+	const color: Record<string, string> = {
+		bar: "accent",
+		now: "success",
+		over: "error",
+		axis: "dim",
+		budget: "warning",
+		dim: "dim",
+		title: "accent",
+	};
+	return (kind, text) => theme.fg(color[kind], text);
 }
 
 export default function tokenBurnExtension(pi: ExtensionAPI) {
@@ -330,7 +533,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 	pi.registerCommand("tokenburn", {
 		description: "TokenBurn stats: show report, toggle widget, or set budgets",
 		getArgumentCompletions: (prefix: string) => {
-			const opts = ["report", "window", "cache", "status <today|week|month|total>", "budget <day|week|month> <tokens|$cost>"];
+			const opts = ["report", "day", "week", "month", "today", "total", "cycle", "window", "cache", "status <today|week|month|total>", "budget <day|week|month> <tokens|$cost>"];
 			return opts.filter((o) => o.startsWith(prefix)).map((value) => ({ value }));
 		},
 		handler: async (args, ctx) => {
@@ -344,11 +547,26 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 				return;
 			}
 
-			if (cmd === "status" && ["today", "week", "month", "total"].includes(p1)) {
-				config.statusWindow = p1 as any;
+			const WINDOWS = ["today", "week", "month", "total"] as const;
+			const setWindow = async (w: (typeof WINDOWS)[number]) => {
+				config.statusWindow = w;
 				await saveConfig(config);
 				await updateUI(ctx);
-				ctx.ui.notify(`tokenburn status window set to: ${p1}`, "info");
+				ctx.ui.notify(`tokenburn status window: ${w}`, "info");
+			};
+
+			// /tokenburn today|week|month|total  — shortcut for the status bar period
+			if ((WINDOWS as readonly string[]).includes(cmd ?? "")) {
+				await setWindow(cmd as (typeof WINDOWS)[number]);
+				return;
+			}
+			if (cmd === "status" && (WINDOWS as readonly string[]).includes(p1 ?? "")) {
+				await setWindow(p1 as (typeof WINDOWS)[number]);
+				return;
+			}
+			// /tokenburn cycle  — today → week → month → total → today
+			if (cmd === "cycle") {
+				await setWindow(WINDOWS[(WINDOWS.indexOf(config.statusWindow) + 1) % WINDOWS.length]);
 				return;
 			}
 
@@ -375,20 +593,26 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 				return;
 			}
 
-			// Default: print report
+			// /tokenburn [report] [day|week|month]  — summary + chart
+			const unitArg = (cmd === "report" || cmd === "chart" ? p1 : cmd) as string | undefined;
+			const unit: Unit = unitArg === "week" || unitArg === "month" ? unitArg : "day";
 			const report = await collectUsage(getSessionsDir(), new Date(), config.includeCache);
+			const series = await collectSeries(getSessionsDir(), unit, DEFAULT_COUNT[unit], new Date(), config.includeCache);
+			const budgetKey = unit === "day" ? "today" : unit === "week" ? "week" : "month";
 			const formatRow = (name: string, p: PeriodStats) =>
-				`${name.padEnd(8)}: ${formatNum(p.tokens).padStart(8)} tokens (${formatCost(p.cost)}) · in:${formatNum(p.input)} out:${formatNum(p.output)} cache:${formatNum(p.cacheRead + p.cacheWrite)} · ${p.sessions} sessions`;
+				`${name.padEnd(10)} ${formatNum(p.tokens).padStart(8)} tokens ${formatCost(p.cost).padStart(9)} · in:${formatNum(p.input)} out:${formatNum(p.output)} cache:${formatNum(p.cacheRead + p.cacheWrite)} · ${p.sessions} sess`;
 
 			const output = [
 				"🔥 TokenBurn Report",
-				"--------------------------------------------------",
+				"─".repeat(60),
 				formatRow("Today", report.today),
 				formatRow("This Week", report.week),
 				formatRow("This Month", report.month),
 				formatRow("All Time", report.total),
-				"--------------------------------------------------",
-				`Use '/tokenburn window' to toggle persistent status window.`,
+				"─".repeat(60),
+				...renderChart(series, unit, { budget: budgetsFor(config, budgetKey as Window), paint: config.chartColor ? themePaint(ctx.ui.theme) : undefined }),
+				"─".repeat(60),
+				"/tokenburn [day|week|month] chart · today|week|month|total|cycle status bar · window · budget · cache",
 			].join("\n");
 
 			ctx.ui.notify(output, "info");
