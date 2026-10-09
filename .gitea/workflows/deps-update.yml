@@ -4,7 +4,7 @@ name: Nightly Dependency Update
 #   1. `bun update` (compatible bumps only); continue only if something REALLY moved up,
 #   2. typecheck + tests + pack check,
 #   3. commit the lockfile (`chore(deps)`),
-#   4. when something is worth shipping (a runtime dependency upgraded, or feat/fix/perf
+#   4. when something is worth shipping (a library upgraded or merged, or feat/fix/perf
 #      commits since the last tag): bump the patch version, tag vX.Y.Z, push main + tag,
 #      and dispatch release.yml (publishes to npm).
 # No changes => no commit, no tag, no release.
@@ -60,27 +60,23 @@ jobs:
         run: |
           T="${RUNNER_TEMP:-/tmp}"
           nu scripts/ci/snapshot_deps.nu "$T/before-all.txt"
-          nu scripts/ci/snapshot_deps.nu "$T/before-prod.txt" --prod
 
       - name: Update dependencies (within their ranges)
         run: |
           bun update
           bun install
 
-      # Only a REAL upgrade counts: `changed` = anything moved up and nothing down;
-      # `ships` = the same for runtime dependencies only (scripts/ci/dep_changes.nu).
+      # Only a REAL upgrade counts: `changed` = anything moved up and nothing down (scripts/ci/dep_changes.nu).
       - name: Check what changed
         id: deps
         run: |
           T="${RUNNER_TEMP:-/tmp}"
           nu scripts/ci/snapshot_deps.nu "$T/after-all.txt"
-          nu scripts/ci/snapshot_deps.nu "$T/after-prod.txt" --prod
           if git diff --quiet -- bun.lock package.json; then
             echo "No dependency changes detected."
-            printf 'changed=false\nships=false\n' >> "$GITHUB_OUTPUT"
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
           else
             nu scripts/ci/dep_changes.nu "$T/before-all.txt"  "$T/after-all.txt"  --key changed --output "$GITHUB_OUTPUT"
-            nu scripts/ci/dep_changes.nu "$T/before-prod.txt" "$T/after-prod.txt" --key ships   --output "$GITHUB_OUTPUT"
           fi
           # Never leave a half-applied update behind when it is not an upgrade.
           if grep -q '^changed=false' "$GITHUB_OUTPUT"; then git checkout -- bun.lock package.json; fi
@@ -96,7 +92,7 @@ jobs:
           nu scripts/ci/quality_gate.nu
 
       - name: Install git-cliff
-        if: steps.deps.outputs.ships == 'true' || steps.unreleased.outputs.releasable == 'true'
+        if: steps.deps.outputs.changed == 'true' || steps.unreleased.outputs.releasable == 'true'
         continue-on-error: true
         uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
@@ -112,7 +108,7 @@ jobs:
 
       - name: Bump patch version, changelog, commit and tag
         id: bump
-        if: steps.deps.outputs.ships == 'true' || steps.unreleased.outputs.releasable == 'true'
+        if: steps.deps.outputs.changed == 'true' || steps.unreleased.outputs.releasable == 'true'
         run: |
           git config user.name  "gitea-actions[bot]"
           git config user.email "gitea-actions[bot]@noreply.gitea"

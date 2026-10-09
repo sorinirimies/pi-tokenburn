@@ -6,10 +6,10 @@ name: Nightly Dependency Update
 #   release  commit the lockfile (`chore(deps)`), and, when something worth shipping
 #            exists, bump the patch version, tag vX.Y.Z, push and start release.yml
 #
-# What counts as "worth shipping" (a patch release):
-#   * a RUNTIME dependency was upgraded (it ships to users), or
-#   * feat / fix / perf commits are waiting since the last tag (scripts/ci/unreleased.nu)
-# Dev-tooling-only bumps are committed but never released on their own.
+# A patch is published when there is something to ship (scripts/ci/unreleased.nu):
+#   * any library was upgraded here (runtime or dev tooling), or
+#   * a library update was merged since the last tag (Dependabot, via auto-merge.yml), or
+#   * feat / fix / perf commits are waiting.
 # No changes => nothing is committed, tagged or released.
 #
 # This host runs on its own: no mirroring to Gitea (it has its own nightly). Publishing
@@ -44,7 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.deps.outputs.changed }}
-      ships: ${{ steps.deps.outputs.ships }}
       releasable: ${{ steps.unreleased.outputs.releasable }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -69,27 +68,23 @@ jobs:
         run: |
           T="${RUNNER_TEMP:-/tmp}"
           nu scripts/ci/snapshot_deps.nu "$T/before-all.txt"
-          nu scripts/ci/snapshot_deps.nu "$T/before-prod.txt" --prod
 
       - name: Update dependencies (within their ranges)
         run: |
           bun update
           bun install
 
-      # Only a REAL upgrade counts: `changed` = anything moved up and nothing down;
-      # `ships` = the same for runtime dependencies only (scripts/ci/dep_changes.nu).
+      # Only a REAL upgrade counts: `changed` = anything moved up and nothing down (scripts/ci/dep_changes.nu).
       - name: Check what changed
         id: deps
         run: |
           T="${RUNNER_TEMP:-/tmp}"
           nu scripts/ci/snapshot_deps.nu "$T/after-all.txt"
-          nu scripts/ci/snapshot_deps.nu "$T/after-prod.txt" --prod
           if git diff --quiet -- bun.lock package.json; then
             echo "No dependency changes detected."
-            printf 'changed=false\nships=false\n' >> "$GITHUB_OUTPUT"
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
           else
             nu scripts/ci/dep_changes.nu "$T/before-all.txt"  "$T/after-all.txt"  --key changed --output "$GITHUB_OUTPUT"
-            nu scripts/ci/dep_changes.nu "$T/before-prod.txt" "$T/after-prod.txt" --key ships   --output "$GITHUB_OUTPUT"
           fi
 
       - name: Unreleased feat/fix/perf commits?
@@ -198,7 +193,6 @@ jobs:
 
       - name: Bump patch version, changelog, commit and tag
         id: bump
-        if: needs.update.outputs.ships == 'true' || needs.update.outputs.releasable == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

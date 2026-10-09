@@ -2,18 +2,27 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Are there user-facing commits since the last release tag?
 # ──────────────────────────────────────────────────────────────────────────────
-# `feat`, `fix` and `perf` commits are worth a patch release. chore / ci / docs /
-# test / refactor / deps commits are not. With no release tag at all nothing is
-# released automatically (create a baseline tag first).
+# A patch release is worth publishing when there is
+#   * a `feat`, `fix` or `perf` commit, or
+#   * a library update: `chore(deps)`, `chore(deps-dev)`, `build(deps)`, `ci(deps)` (the nightly
+#     lockfile update and merged Dependabot PRs).
+# Plain chore / ci / docs / test / refactor / style commits and release commits are not.
+# With no release tag at all nothing is released automatically (create a baseline tag first).
 #
 # Usage:
 #   nu scripts/ci/unreleased.nu [--output "$GITHUB_OUTPUT"]
 # Writes `releasable=true|false` and `unreleased=N`.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# A commit subject counts when it is feat/fix/perf (optionally scoped, optionally breaking).
+# A commit subject counts when it is feat/fix/perf (optionally scoped, optionally breaking)
+# or a library update.
 export def is_releasable [subject: string]: nothing -> bool {
-    ($subject | find --regex '^(feat|fix|perf)(\([^)]*\))?!?:' | is-not-empty)
+    ($subject | find --regex '^(feat|fix|perf)(\([^)]*\))?!?:' | is-not-empty) or (is_library_update $subject)
+}
+
+# `chore(deps): …`, `ci(deps): …`, `build(deps-dev): …`: what the nightly job and Dependabot write.
+export def is_library_update [subject: string]: nothing -> bool {
+    ($subject | find --regex '^(chore|ci|build)\(deps(-dev)?\)!?:' | is-not-empty)
 }
 
 export def count_releasable [subjects: list]: nothing -> int {
