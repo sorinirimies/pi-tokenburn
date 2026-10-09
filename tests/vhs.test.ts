@@ -6,7 +6,8 @@ import { collectAllSeries, collectUsage, parseCommand } from "../extensions/toke
 
 const ROOT = join(import.meta.dir, "..");
 const VHS = join(ROOT, "examples", "vhs");
-const read = (p: string) => readFileSync(p, "utf8");
+// Windows checkouts may convert to CRLF: compare on LF only.
+const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const tapes = readdirSync(VHS).filter((f) => f.endsWith(".tape")).sort();
 const gifRefsInReadme = [...read(join(ROOT, "README.md")).matchAll(/examples\/vhs\/generated\/([\w-]+\.gif)/g)].map((m) => m[1]);
 const posix = process.platform !== "win32";
@@ -80,6 +81,12 @@ describe("README previews and Git LFS", () => {
 		const attrs = read(join(ROOT, ".gitattributes"));
 		expect(attrs).toContain("*.gif filter=lfs diff=lfs merge=lfs -text");
 		expect(attrs).toContain("examples/vhs/generated/*.png filter=lfs diff=lfs merge=lfs -text");
+	});
+
+	it("scripts and tapes are pinned to LF line endings", () => {
+		const attrs = read(join(ROOT, ".gitattributes"));
+		expect(attrs).toContain("*.sh text eol=lf");
+		expect(attrs).toContain("*.tape text eol=lf");
 	});
 
 	it("the demo assets never ship in the npm package", () => {
