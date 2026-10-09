@@ -25,33 +25,35 @@ jobs:
     name: Test, publish, release notes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
       - name: Install nushell
-        uses: hustcer/setup-nu@v3
+        uses: hustcer/setup-nu@95cd3bfe252450ef7d35dd9a7ddecf3484341134 # v3
         with:
           version: "0.111.0"
 
       - name: Install git-cliff
         continue-on-error: true
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: git-cliff
 
       # The tag must be vX.Y.Z and equal the version in package.json.
       - name: Validate tag
         id: tag
-        run: nu scripts/ci/validate_tag.nu "${{ inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+        run: nu scripts/ci/validate_tag.nu "$TAG" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
 
       - run: bun install --frozen-lockfile
 
@@ -64,12 +66,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create Gitea release
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          TOKEN: ${{ secrets.GITEA_TOKEN || github.token }}
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
           (command -v git-cliff >/dev/null && git-cliff --latest --strip header > notes.md) || echo "Release ${TAG}" > notes.md
           BODY=$(python3 -c 'import json,sys; print(json.dumps({"tag_name": sys.argv[1], "name": sys.argv[1], "body": open("notes.md").read()}))' "$TAG")
-          curl -s -X POST \
-            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases" \
-            -H "Authorization: token ${{ secrets.GITEA_TOKEN || github.token }}" \
+          curl -s -X POST "$API/releases" \
+            -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
             -d "$BODY" || echo "⚠️  Release creation failed (it may already exist)."

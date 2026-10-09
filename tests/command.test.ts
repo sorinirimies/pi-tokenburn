@@ -11,19 +11,28 @@ describe("parseCommand", () => {
 		expect(parseCommand("   ")).toEqual({ kind: "report", view: "day" });
 	});
 
-	it("accepts day, today, week, month, year and all as report views", () => {
-		for (const [arg, view] of [["day", "day"], ["today", "day"], ["week", "week"], ["month", "month"], ["year", "year"], ["all", "all"]] as const) {
-			expect(parseCommand(arg)).toEqual({ kind: "report", view });
+	it("bare day/today/week/month/year/all/total set the STATUS BAR period (no chart)", () => {
+		for (const [arg, window] of [["day", "today"], ["today", "today"], ["week", "week"], ["month", "month"], ["year", "year"], ["all", "total"], ["total", "total"]] as const) {
+			expect(parseCommand(arg)).toEqual({ kind: "status", window });
 		}
 	});
 
 	it("is case- and whitespace-insensitive", () => {
-		expect(parseCommand("  MONTH ")).toEqual({ kind: "report", view: "month" });
+		expect(parseCommand("  MONTH ")).toEqual({ kind: "status", window: "month" });
+		expect(parseCommand("CHART  Week")).toEqual({ kind: "report", view: "week" });
 	});
 
-	it("accepts report/chart prefix", () => {
+	it("`chart <view>` shows the chart for day, week, month, year and all", () => {
+		for (const [arg, view] of [["day", "day"], ["today", "day"], ["week", "week"], ["month", "month"], ["year", "year"], ["all", "all"], ["total", "all"]] as const) {
+			expect(parseCommand(`chart ${arg}`)).toEqual({ kind: "report", view });
+		}
+		expect(parseCommand("chart")).toEqual({ kind: "report", view: "day" });
+		expect(parseCommand("chart nope").kind).toBe("invalid");
+		expect((parseCommand("chart nope") as any).message).toContain('Unknown chart "nope"');
+	});
+
+	it("`report <view>` still works as an alias of chart", () => {
 		expect(parseCommand("report week")).toEqual({ kind: "report", view: "week" });
-		expect(parseCommand("chart all")).toEqual({ kind: "report", view: "all" });
 		expect(parseCommand("report")).toEqual({ kind: "report", view: "day" });
 		expect(parseCommand("report nope").kind).toBe("invalid");
 	});
@@ -58,7 +67,7 @@ describe("parseCommand", () => {
 	it("rejects unknown words with a helpful message", () => {
 		const c = parseCommand("bogus");
 		expect(c.kind).toBe("invalid");
-		expect((c as any).message).toContain("day|week|month|year|all");
+		expect((c as any).message).toContain("chart [day|week|month|year|all]");
 	});
 });
 
@@ -72,9 +81,9 @@ describe("completions", () => {
 		}
 	});
 
-	it("offers day, week, month, year, all at the top level", () => {
+	it("offers day, week, month, year, all, chart and the rest at the top level", () => {
 		const values = completions("")!.map((i) => i.value.trim());
-		for (const v of ["day", "week", "month", "year", "all", "status", "cycle", "window", "budget", "cache"]) {
+		for (const v of ["day", "week", "month", "year", "all", "chart", "status", "cycle", "window", "budget", "cache"]) {
 			expect(values).toContain(v);
 		}
 	});
@@ -82,6 +91,7 @@ describe("completions", () => {
 	it("filters by prefix", () => {
 		expect(completions("mo")!.map((i) => i.value)).toEqual(["month"]);
 		expect(completions("y")!.map((i) => i.value)).toEqual(["year"]);
+		expect(completions("ch")!.map((i) => i.value)).toEqual(["chart "]);
 		expect(completions("zzz")).toBeNull();
 	});
 
@@ -93,6 +103,9 @@ describe("completions", () => {
 		expect(completions("budget ")!.map((i) => i.value)).toEqual(["budget day ", "budget week ", "budget month "]);
 		expect(completions("budget w")!.map((i) => i.value)).toEqual(["budget week "]);
 		expect(completions("report a")!.map((i) => i.value)).toEqual(["report all"]);
+		expect(completions("chart ")!.map((i) => i.value)).toEqual(["chart day", "chart week", "chart month", "chart year", "chart all"]);
+		expect(completions("chart y")!.map((i) => i.value)).toEqual(["chart year"]);
+		expect(completions("chart ")!.every((i) => /^Chart: /.test(i.description ?? ""))).toBe(true);
 	});
 
 	it("stops completing once a budget period is chosen", () => {

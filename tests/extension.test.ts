@@ -140,17 +140,17 @@ describe("pi-tokenburn chart + window commands", () => {
 		expect(seen).toEqual(["week", "month", "year", "total", "today"]);
 	});
 
-	it("bare day/week/month/year/all show a report with the matching chart", async () => {
+	it("`chart <view>` shows the report with the matching chart and leaves the status bar alone", async () => {
 		const titles: Record<string, string> = {
 			"": "Daily tokens · last 14 days",
-			day: "Daily tokens · last 14 days",
-			today: "Daily tokens · last 14 days",
-			week: "Weekly tokens · last 8 weeks",
-			month: "Monthly tokens · last 6 months",
-			year: "Yearly tokens · last 5 years",
-			all: "All time ·",
-			"report month": "Monthly tokens · last 6 months",
+			chart: "Daily tokens · last 14 days",
+			"chart day": "Daily tokens · last 14 days",
+			"chart today": "Daily tokens · last 14 days",
+			"chart week": "Weekly tokens · last 8 weeks",
+			"chart month": "Monthly tokens · last 6 months",
 			"chart year": "Yearly tokens · last 5 years",
+			"chart all": "All time ·",
+			"report month": "Monthly tokens · last 6 months",
 		};
 		for (const [arg, title] of Object.entries(titles)) {
 			await command.handler(arg, ctx());
@@ -158,19 +158,33 @@ describe("pi-tokenburn chart + window commands", () => {
 			expect(out).toContain("TokenBurn Report");
 			expect(out).toContain("This Year");
 			expect(out).toContain(title);
+			expect(status.tokenburn).toContain("[today]");
 		}
 	});
 
-	it("`month` no longer changes the status bar", async () => {
-		await command.handler("month", ctx());
-		expect(status.tokenburn).toContain("[today]");
+	it("bare day/week/month/year/all switch the BOTTOM LINE and do not print a chart", async () => {
+		const expected: Record<string, string> = { week: "week", month: "month", year: "year", all: "total", day: "today", today: "today", total: "total" };
+		for (const [arg, window] of Object.entries(expected)) {
+			notes.length = 0;
+			await command.handler(arg, ctx());
+			expect(status.tokenburn, arg).toContain(`[${window}]`);
+			expect(notes.at(-1), arg).toBe(`tokenburn status window: ${window}`);
+			expect(notes.join("\n")).not.toContain("tokens ·");
+		}
+	});
+
+	it("each status period shows the matching totals in the bottom line", async () => {
+		await command.handler("year", ctx());
+		expect(status.tokenburn).toMatch(/1\.0k .*\[year\]/);
+		await command.handler("all", ctx());
+		expect(status.tokenburn).toMatch(/1\.0k .*\[total\]/);
 	});
 
 	it("warns (does not throw) on unknown input", async () => {
 		await command.handler("bogus", ctx());
 		expect(notes.at(-1)).toContain('Unknown option "bogus"');
-		await command.handler("report nope", ctx());
-		expect(notes.at(-1)).toContain('Unknown view "nope"');
+		await command.handler("chart nope", ctx());
+		expect(notes.at(-1)).toContain('Unknown chart "nope"');
 		await command.handler("status nope", ctx());
 		expect(notes.at(-1)).toContain("Usage: /tokenburn status");
 	});

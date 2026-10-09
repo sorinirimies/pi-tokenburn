@@ -72,7 +72,7 @@ describe("every command documented in the README works", () => {
 	it("finds a meaningful set of examples in the README", () => {
 		const cmds = readmeCommands();
 		expect(cmds.length).toBeGreaterThanOrEqual(15);
-		for (const must of ["", "day", "week", "month", "year", "all", "cycle", "window", "cache", "status year", "budget day 5000000", "budget week $50"]) {
+		for (const must of ["", "day", "week", "month", "year", "all", "chart day", "chart week", "chart month", "chart year", "chart all", "cycle", "window", "cache", "status year", "budget day 5000000", "budget week $50"]) {
 			expect(cmds).toContain(must);
 		}
 	});

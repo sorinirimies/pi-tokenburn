@@ -108,11 +108,24 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 			statusWindow: (STATUS_WINDOWS as readonly string[]).includes(parsed.statusWindow)
 				? parsed.statusWindow
 				: DEFAULT_CONFIG.statusWindow,
-			budgets: typeof parsed.budgets === "object" && parsed.budgets !== null ? { ...parsed.budgets } : {},
+			budgets: sanitizeBudgets(parsed.budgets),
 		};
 	} catch {
 		return freshConfig();
 	}
+}
+
+const BUDGET_KEYS = ["dayTokens", "weekTokens", "monthTokens", "dayCost", "weekCost", "monthCost"] as const;
+
+/** Keep only known budget keys holding positive, finite numbers (the file is hand-editable). */
+export function sanitizeBudgets(value: unknown): TokenBurnConfig["budgets"] {
+	const out: TokenBurnConfig["budgets"] = {};
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return out;
+	for (const key of BUDGET_KEYS) {
+		const n = (value as Record<string, unknown>)[key];
+		if (typeof n === "number" && Number.isFinite(n) && n > 0) out[key] = n;
+	}
+	return out;
 }
 
 /** A config that shares no mutable state with DEFAULT_CONFIG. */
@@ -571,7 +584,8 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		config = await loadConfig();
-		await updateUI(ctx);
+		// A failing refresh must never break session start.
+		await updateUI(ctx).catch(() => {});
 	});
 
 	// Fire-and-forget: never block the agent loop on a stats refresh.
@@ -580,7 +594,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("tokenburn", {
-		description: "TokenBurn: /tokenburn [day|week|month|year|all] chart, status <window>, cycle, window, budget, cache",
+		description: "TokenBurn: /tokenburn [day|week|month|year|all] sets the status bar; /tokenburn chart <day|week|month|year|all> shows the chart",
 		getArgumentCompletions: (prefix: string) => completions(prefix),
 		handler: async (args, ctx) => {
 			const cmd = parseCommand(args);
@@ -666,7 +680,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 							rule,
 							...chart,
 							rule,
-							"/tokenburn day|week|month|year|all · status <window> · cycle · window · budget · cache",
+							"/tokenburn chart <day|week|month|year|all> · /tokenburn <day|week|month|year|all> sets the status bar · cycle · window · budget · cache",
 						].join("\n"),
 						"info",
 					);
@@ -695,24 +709,37 @@ export type Command =
 	| { kind: "invalid"; message: string };
 
 export const USAGE =
-	"Usage: /tokenburn [day|week|month|year|all] · status <today|week|month|year|total> · cycle · window · budget <day|week|month> <tokens|$cost> · cache";
+	"Usage: /tokenburn [day|week|month|year|all] (status-bar period) · chart [day|week|month|year|all] · status <today|week|month|year|total> · cycle · window · budget <day|week|month> <tokens|$cost> · cache";
 
+/** Words that pick the status-bar period: `day` shows today, `all` shows the all-time total. */
+const WORD_TO_WINDOW: Record<string, Window> = {
+	day: "today",
+	today: "today",
+	week: "week",
+	month: "month",
+	year: "year",
+	all: "total",
+	total: "total",
+};
+
+/** Views the chart can show. */
 const asView = (w: string | undefined): ReportView | undefined =>
-	w === "today" ? "day" : (REPORT_VIEWS as readonly string[]).includes(w ?? "") ? (w as ReportView) : undefined;
+	w === "today" ? "day" : w === "total" ? "all" : (REPORT_VIEWS as readonly string[]).includes(w ?? "") ? (w as ReportView) : undefined;
 
 export function parseCommand(args: string | undefined): Command {
 	const [cmd, p1, p2] = (args ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
 	if (!cmd) return { kind: "report", view: "day" };
 
-	const view = asView(cmd);
-	if (view) return { kind: "report", view };
+	// /tokenburn day|week|month|year|all → what the bottom status line shows
+	const window = WORD_TO_WINDOW[cmd];
+	if (window) return { kind: "status", window };
 
 	switch (cmd) {
-		case "report":
-		case "chart": {
+		case "chart":
+		case "report": {
 			if (p1 === undefined) return { kind: "report", view: "day" };
 			const v = asView(p1);
-			return v ? { kind: "report", view: v } : { kind: "invalid", message: `Unknown view "${p1}". ${USAGE}` };
+			return v ? { kind: "report", view: v } : { kind: "invalid", message: `Unknown chart "${p1}". ${USAGE}` };
 		}
 		case "status":
 			return (STATUS_WINDOWS as readonly string[]).includes(p1 ?? "")
@@ -745,13 +772,22 @@ export interface CompletionItem {
 	description?: string;
 }
 
+const CHART_SPAN: Record<ReportView, string> = {
+	day: "last 14 days",
+	week: "last 8 weeks",
+	month: "last 6 months",
+	year: "last 5 years",
+	all: "whole history",
+};
+
 const TOP_LEVEL: CompletionItem[] = [
-	{ value: "day", label: "day", description: "Report + daily chart (last 14 days)" },
-	{ value: "week", label: "week", description: "Report + weekly chart (last 8 weeks)" },
-	{ value: "month", label: "month", description: "Report + monthly chart (last 6 months)" },
-	{ value: "year", label: "year", description: "Report + yearly chart (last 5 years)" },
-	{ value: "all", label: "all", description: "Report + whole history" },
-	{ value: "status ", label: "status", description: "Set the status-bar period" },
+	{ value: "day", label: "day", description: "Status bar: today" },
+	{ value: "week", label: "week", description: "Status bar: this week" },
+	{ value: "month", label: "month", description: "Status bar: this month" },
+	{ value: "year", label: "year", description: "Status bar: this year" },
+	{ value: "all", label: "all", description: "Status bar: all-time total" },
+	{ value: "chart ", label: "chart", description: "Report + chart: day, week, month, year or all" },
+	{ value: "status ", label: "status", description: "Set the status-bar period explicitly" },
 	{ value: "cycle", label: "cycle", description: "Rotate the status-bar period" },
 	{ value: "window", label: "window", description: "Toggle the panel below the editor" },
 	{ value: "budget ", label: "budget", description: "Set a day/week/month budget" },
@@ -771,7 +807,7 @@ export function completions(prefix: string): CompletionItem[] | null {
 		pool = sub("budget", BUDGET_PERIODS, (w) => `Set the ${w} budget (tokens or $cost)`, " ");
 	else if (/^(report|chart) /.test(text)) {
 		const head = text.split(" ")[0];
-		pool = sub(head, REPORT_VIEWS, (w) => `${head} for ${w}`);
+		pool = sub(head, REPORT_VIEWS, (w) => `Chart: ${CHART_SPAN[w as ReportView]}`);
 	} else pool = TOP_LEVEL;
 
 	const out = pool.filter((i) => i.value.startsWith(text));

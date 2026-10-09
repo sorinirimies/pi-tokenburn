@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tokenBurn, { clearCache, fileSignature, resolveAgentDir, resolveSessionsDir } from "../extensions/tokenburn.ts";
+import tokenBurn, { clearCache, fileSignature, resolveAgentDir, resolveSessionsDir, sanitizeBudgets } from "../extensions/tokenburn.ts";
 
 describe("path resolution", () => {
 	it("resolveAgentDir: PI_CODING_AGENT_DIR, then XDG, then ~/.pi/agent", () => {
@@ -25,6 +25,22 @@ describe("path resolution", () => {
 		expect(fileSignature(join(d, "f"))).toMatch(/^\d+(\.\d+)?:3$/);
 		expect(fileSignature(join(d, "nope"))).toBeUndefined();
 		rmSync(d, { recursive: true, force: true });
+	});
+});
+
+describe("config hardening", () => {
+	it("sanitizeBudgets keeps only known keys with positive finite numbers", () => {
+		expect(sanitizeBudgets({ dayTokens: 5, weekCost: 2.5, monthTokens: 0, dayCost: -1, weekTokens: "9", monthCost: Infinity, junk: 1 })).toEqual({ dayTokens: 5, weekCost: 2.5 });
+	});
+
+	it("sanitizeBudgets tolerates non-objects", () => {
+		for (const v of [undefined, null, 5, "x", [1, 2], true]) expect(sanitizeBudgets(v)).toEqual({});
+	});
+
+	it("sanitizeBudgets ignores prototype-pollution keys", () => {
+		const evil = JSON.parse('{"__proto__": {"polluted": true}, "constructor": {"x": 1}, "dayTokens": 7}');
+		expect(sanitizeBudgets(evil)).toEqual({ dayTokens: 7 });
+		expect(({} as any).polluted).toBeUndefined();
 	});
 });
 
@@ -103,6 +119,22 @@ describe("extension lifecycle", () => {
 		await new Promise((r) => setTimeout(r, 20));
 	});
 
+	it("a hand-edited config with junk values is sanitised at load", async () => {
+		await boot({ budgets: { dayTokens: "lots", weekTokens: 10, bogus: 1 }, statusWindow: "week", showWidget: "yes" });
+		expect(status.tokenburn).toContain("[week]");
+		expect(status.tokenburn).toContain("OVER BUDGET"); // the valid weekTokens=10 applied; the junk did not
+		await command.handler("budget day 1", ctx());
+		const saved = JSON.parse(readFileSync(join(dir, "tokenburn.json"), "utf8"));
+		expect(saved.budgets).toEqual({ weekTokens: 10, dayTokens: 1 });
+	});
+
+	it("session_start survives a UI that throws", async () => {
+		handlers = {};
+		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: () => {} } as any);
+		const broken: any = { hasUI: true, ui: { get theme() { throw new Error("no theme"); }, setStatus() {}, setWidget() {}, notify() {} } };
+		await expect(handlers.session_start({}, broken)).resolves.toBeUndefined();
+	});
+
 	it("does nothing without a UI", async () => {
 		handlers = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: () => {} } as any);
@@ -140,7 +172,7 @@ describe("extension lifecycle", () => {
 
 	it("the report shows the year row and an all-time chart", async () => {
 		await boot();
-		await command.handler("all", ctx());
+		await command.handler("chart all", ctx());
 		expect(notes.at(-1)).toContain("This Year");
 		expect(notes.at(-1)).toContain("All time");
 	});
@@ -150,9 +182,9 @@ describe("extension lifecycle", () => {
 		const counting = { hasUI: true, ui: { theme: { fg: (_c: string, t: string) => (calls++, t) }, setStatus() {}, setWidget() {}, notify: (m: string) => notes.push(m) } };
 		await boot({ chartColor: false });
 		const before = calls;
-		await command.handler("day", counting);
+		await command.handler("chart day", counting);
 		const used = calls - before;
-		await command.handler("day", ctx());
+		await command.handler("chart day", ctx());
 		expect(used).toBeLessThanOrEqual(6); // only the status bar's fg calls, none from the chart
 		expect(notes.at(-1)).toContain("Daily tokens");
 	});

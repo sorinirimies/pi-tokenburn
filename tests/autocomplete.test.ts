@@ -13,7 +13,7 @@ const TYPED = [
 	"c", "cycle", "ca", "cache", "wi", "window",
 	"b", "budget", "budget ", "budget d", "budget w", "budget m", "budget day",
 	"r", "report", "report ", "report d", "report w", "report m", "report y", "report a",
-	"ch", "chart", "chart ", "chart m",
+	"ch", "chart", "chart ", "chart d", "chart w", "chart m", "chart y", "chart a", "chart all", "chart zzz",
 	"zzz", "status zzz", "budget day ", "budget day 5", "report week ",
 ];
 
@@ -88,22 +88,36 @@ describe("pi's real autocomplete provider × the tokenburn command", () => {
 		expect(applied).toBeGreaterThan(40);
 	});
 
-	it("`/tokenburn day` (the exact input from the crash report) completes and runs", async () => {
+	it("`/tokenburn day` (the exact input from the crash report) completes and switches the bottom line", async () => {
 		const line = "/tokenburn day";
 		const s = await suggest(line);
 		expect(s).not.toBeNull();
 		const item = s!.items.find((i) => i.label === "day")!;
 		const out = provider.applyCompletion([line], 0, line.length, item, s!.prefix);
 		expect(out.lines[0]).toBe("/tokenburn day");
+		await command.handler("week", ctx());
 		await command.handler("day", ctx());
-		expect(notes.at(-1)).toContain("Daily tokens");
+		expect(status.tokenburn).toContain("[today]");
+		expect(notes.at(-1)).toBe("tokenburn status window: today");
+	});
+
+	it("`/tokenburn chart ` offers every chart and applying one prints that chart", async () => {
+		const line = "/tokenburn chart m";
+		const s = await suggest(line);
+		expect(s!.items.map((i) => i.value)).toEqual(["chart month"]);
+		const out = provider.applyCompletion([line], 0, line.length, s!.items[0], s!.prefix);
+		expect(out.lines[0]).toBe("/tokenburn chart month");
+		await command.handler("chart month", ctx());
+		expect(notes.at(-1)).toContain("Monthly tokens");
+		const all = await suggest("/tokenburn chart ");
+		expect(all!.items.map((i) => i.label)).toEqual(["day", "week", "month", "year", "all"]);
 	});
 
 	it("offers day/week/month/year/all first, then the other options, with descriptions", async () => {
 		const s = await suggest("/tokenburn ");
 		const labels = s!.items.map((i) => i.label);
 		expect(labels.slice(0, 5)).toEqual(["day", "week", "month", "year", "all"]);
-		for (const l of ["status", "cycle", "window", "budget", "cache"]) expect(labels).toContain(l);
+		for (const l of ["chart", "status", "cycle", "window", "budget", "cache"]) expect(labels).toContain(l);
 		for (const i of s!.items) expect(i.description && i.description.length).toBeGreaterThan(3);
 	});
 

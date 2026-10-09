@@ -10,7 +10,7 @@ Totals match the `tokenburn` CLI exactly.
 
 - **Status bar:** `🔥 1.20M ($52.79) [today]`, turns red with `OVER BUDGET` past your limit.
 - **Report chart:** `/tokenburn` shows the summary plus a vertical column chart (y-axis, budget line, current period marked, over-budget columns in red, peak/avg footer). Daily (14 days), weekly (8 weeks) or monthly (6 months).
-- **Views:** `/tokenburn day|week|month|year|all`. Status bar period: `/tokenburn status <window>` or `/tokenburn cycle`.
+- **Status line:** `/tokenburn day|week|month|year|all` (or `cycle`) changes the period shown at the bottom. Charts live under `/tokenburn chart <view>`.
 - **Window panel (optional):** Today / Week / Month / Total below the editor, with in/out tokens and cost.
 - **Budgets** per day, week and month, in tokens and/or dollars.
 - **Fast:** per-file cache keyed on mtime+size. First scan of ~400 MB of sessions takes under a second; refreshes after that take milliseconds. Refresh never blocks the agent loop.
@@ -27,22 +27,19 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 
 | Command | What it does |
 |---|---|
-| `/tokenburn` · `day` · `today` | Report + **daily** chart (last 14 days) |
-| `/tokenburn week` | Report + **weekly** chart (last 8 weeks) |
-| `/tokenburn month` | Report + **monthly** chart (last 6 months) |
-| `/tokenburn year` | Report + **yearly** chart (last 5 years) |
-| `/tokenburn all` | Report + whole history (monthly columns up to 18 months, yearly beyond) |
-| `/tokenburn report <view>` · `chart <view>` | Same as above, explicit form |
-| `/tokenburn status <today\|week\|month\|year\|total>` | Set the status-bar period |
-| `/tokenburn cycle` | Rotate the status-bar period: today → week → month → year → total |
+| `/tokenburn day\|week\|month\|year\|all` | **Switch the bottom status line**: today, this week, this month, this year, or the all-time total |
+| `/tokenburn chart <view>` | Report + **chart**. Views: `day` (14 days), `week` (8 weeks), `month` (6 months), `year` (5 years), `all` (whole history; monthly columns up to 18 months, yearly beyond) |
+| `/tokenburn` | Report + daily chart (same as `/tokenburn chart day`) |
+| `/tokenburn cycle` | Rotate the status line: today → week → month → year → total |
+| `/tokenburn status <today\|week\|month\|year\|total>` | Explicit form of the first row |
 | `/tokenburn window` | Toggle the panel below the editor |
 | `/tokenburn budget <day\|week\|month> <tokens>` | Token budget, e.g. `budget day 5000000` |
 | `/tokenburn budget <day\|week\|month> $<cost>` | Dollar budget, e.g. `budget week $50` |
 | `/tokenburn cache` | Toggle counting cache read/write tokens |
 
-Tab-completion works for all of the above. Unknown input prints usage instead of failing.
+Tab-completion works for all of these. Unknown input prints usage instead of failing. `report <view>` is kept as an alias of `chart <view>`.
 
-Chart example (`/tokenburn`, with a 600M day budget):
+Chart example (`/tokenburn chart day`, with a 600M day budget):
 
 ```
 Daily tokens · last 14 days  ┄ budget 600.00M
@@ -80,6 +77,12 @@ Weeks start on Monday, in local time.
 - `chartColor` (default `true`): color the chart using your pi theme (current period green, over-budget red, budget line yellow). Set `false` for plain text.
 
 Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CODING_AGENT_SESSION_DIR`, `PI_CODING_AGENT_DIR`.
+
+## Security notes
+
+- **Local and read-only.** It reads pi's session logs and its own `tokenburn.json`. Nothing leaves your machine: no network, no telemetry, no shell commands, **zero runtime dependencies**.
+- **Never breaks pi.** Stats refreshes are fire-and-forget and swallow their own errors, so a failure here cannot interrupt a turn or a session start.
+- **Hand-edited config is sanitised.** Unknown or non-numeric budget values are dropped.
 
 ## Development
 
