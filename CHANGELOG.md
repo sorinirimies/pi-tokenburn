@@ -3,6 +3,12 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.4](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.4) — 2026-10-12
+
+
+### 🔧 Build & CI
+
+- **deps:** Bump taiki-e/install-action from 2.87.26 to 2.87.27 (#3) ([`51bb5a3`](https://github.com/sorinirimies/pi-tokenburn/commit/51bb5a31d55b20b502f1bb89c930020bb4754ab5))
 ## [0.5.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.1) — 2026-10-09
 
 
