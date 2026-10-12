@@ -188,18 +188,20 @@ Pi sessions only. For Zed, Claude Code, Codex, Gemini and more, use the Rust [to
 
 ## Related plugins
 
-Three small [pi](https://github.com/earendil-works/pi-coding-agent) extensions that save tokens without adding anything to the system prompt:
+Four small [pi](https://github.com/earendil-works/pi-coding-agent) extensions that save tokens without adding anything to the system prompt:
 
 | Plugin | What it does |
 |---|---|
 | [**pi-edit-first**](https://github.com/sorinirimies/pi-edit-first) | Blocks whole-file `write` rewrites and hand-written project manifests, steering the agent to targeted `edit` calls and scaffolders |
 | [**pi-read-guard**](https://github.com/sorinirimies/pi-read-guard) | Blocks full reads of large files, steering the agent to `offset`/`limit` or search |
 | [**pi-tokenburn**](https://github.com/sorinirimies/pi-tokenburn) | Live token and cost counter in pi's footer, with charts and budgets |
+| [**pi-context-diet**](https://github.com/sorinirimies/pi-context-diet) | Drops stale tool results from the context when the prompt cache is already cold, so long sessions cost less |
 
 ```bash
 pi install npm:pi-edit-first
 pi install npm:pi-read-guard
 pi install npm:pi-tokenburn
+pi install npm:pi-context-diet
 ```
 
 MIT
