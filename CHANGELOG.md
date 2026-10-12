@@ -3,6 +3,21 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.5](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.5) — 2026-10-12
+
+
+### 📚 Docs
+
+- List pi-context-diet in the related plugins ([`c1952c3`](https://github.com/sorinirimies/pi-tokenburn/commit/c1952c3ec1b388a8523f0a972aac636802f800a9))
+
+### 🧪 Tests
+
+- No test may touch the real ~/.pi/agent (preload sets a temp config dir; the autocomplete test persisted mode=always into it) ([`264913e`](https://github.com/sorinirimies/pi-tokenburn/commit/264913e7124714e1a618d0e861d101579c874522))
+
+### 🔧 Build & CI
+
+- **deps:** Bump actions/setup-node from 7.0.0 to 7.1.0 (#4) ([`6f3c03c`](https://github.com/sorinirimies/pi-tokenburn/commit/6f3c03c33c6a6e5e093a2ddb07734e2e5a7b90fa))
+- Restore the Gitea nightly and release workflows (both hosts run the full pipeline in parallel) ([`2bfd29a`](https://github.com/sorinirimies/pi-tokenburn/commit/2bfd29aaa5e9991859cfefc2a282b3abf2bd54dd))
 ## [0.5.4](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.4) — 2026-10-12
 
 
