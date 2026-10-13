@@ -25,9 +25,15 @@ Totals match the `tokenburn` CLI exactly.
 
 ## Install
 
+From npm:
+
 ```bash
 pi install npm:pi-tokenburn
-# or
+```
+
+Or from git:
+
+```bash
 pi install git:github.com/sorinirimies/pi-tokenburn
 ```
 
