@@ -3,6 +3,18 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.7](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.7) — 2026-10-14
+
+
+### 📚 Docs
+
+- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
+- Separate install commands for individual copy ([`fb38f4a`](https://github.com/sorinirimies/pi-tokenburn/commit/fb38f4a671ee887b3812e83191071025239f628a))
+
+### 🔧 Build & CI
+
+- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
+- Don't release on ci(deps) (GitHub Actions) bumps ([`6159ef4`](https://github.com/sorinirimies/pi-tokenburn/commit/6159ef487b5af9166f98368c3e28779dec37c65b))
 ## [0.5.6](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.6) — 2026-10-13
 
 
