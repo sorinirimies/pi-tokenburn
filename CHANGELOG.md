@@ -3,6 +3,17 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.5.8](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.8) — 2026-10-15
+
+
+### 🔧 Build & CI
+
+- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
+
+### 🧹 Chores
+
+- **justfile:** Push/pull current branch instead of hardcoded main ([`8a82d42`](https://github.com/sorinirimies/pi-tokenburn/commit/8a82d421c8b515c129cc808b1ea1cccd75856420))
+- Nightly dev-tooling lockfile update 2026-10-15 (not released) ([`a7d59a8`](https://github.com/sorinirimies/pi-tokenburn/commit/a7d59a86bfbebac6076af4d4965afb2a762ad8cc))
 ## [0.5.7](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.7) — 2026-10-14
 
 
