@@ -106,6 +106,12 @@ publish: check
 # nexus-lab. Every *-all recipe loops over REMOTES, skips remotes this checkout does not have,
 # and keeps going when one fails. Recipes that move history by force say so: be sure!
 
+# Fail fast (5 s) instead of hanging when a remote host is unreachable.
+export GIT_SSH_COMMAND := "ssh -o ConnectTimeout=5 -o BatchMode=yes"
+
+# Unreachable remotes warn and are skipped; real rejections still fail the recipe.
+PUSHFN := 'gpush() { out=$(git push "$@" 2>&1); rc=$?; if [ $rc -ne 0 ] && printf "%s" "$out" | grep -Eqi "timed out|could not resolve|connection refused|no route to host|network is unreachable"; then echo "⚠️  $r unreachable - NOT pushed (skipped)"; return 0; fi; [ -n "$out" ] && printf "%s\n" "$out"; return $rc; }'
+
 REMOTES := "origin gitea-microlab gitea-starscream gitea-nexus-lab"
 
 # Show all configured remotes
@@ -157,10 +163,11 @@ push-gitea-nexus-lab-force:
 # Push the current branch to every remote (continues on failure)
 push-all:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to push to:$failed"; exit 1; fi
     echo "✅ Pushed to every configured remote"
@@ -168,10 +175,11 @@ push-all:
 # Force-push the current branch to every remote (continues on failure). No lease!
 push-all-force:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --force "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --force "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to force-push to:$failed"; exit 1; fi
     echo "✅ Force-pushed to every configured remote"
@@ -218,10 +226,11 @@ push-tags-force:
 # Push all tags to every remote (continues on failure)
 push-tags-all:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push "$r" --tags || failed="$failed $r"
+        gpush "$r" --tags || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to push tags to:$failed"; exit 1; fi
     echo "✅ Tags pushed to every configured remote"
@@ -229,10 +238,11 @@ push-tags-all:
 # Force-push all tags to every remote (continues on failure; moves existing tags). Be sure!
 push-tags-all-force:
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --force "$r" --tags || failed="$failed $r"
+        gpush --force "$r" --tags || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to force-push tags to:$failed"; exit 1; fi
     echo "✅ Tags force-pushed to every configured remote"
@@ -268,10 +278,11 @@ release-gitea-nexus-lab kind: (bump kind)
 # Bump, commit, tag, then push to every remote (continues on failure)
 release-all kind: (bump kind)
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Release failed to push to:$failed"; exit 1; fi
     echo "✅ Release v$(nu scripts/version.nu) pushed to every configured remote"
@@ -279,10 +290,11 @@ release-all kind: (bump kind)
 # Push the latest commit and its tags to every remote, no bump (continues on failure)
 push-release-all: check
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to push to:$failed"; exit 1; fi
     echo "✅ Latest commit and tags pushed to every configured remote"
@@ -290,10 +302,11 @@ push-release-all: check
 # Force-push the latest commit and its tags to every remote, no bump. Be sure!
 push-release-all-force: check
     #!/usr/bin/env sh
+    {{PUSHFN}}
     failed=""
     for r in {{ REMOTES }}; do
         git remote get-url "$r" >/dev/null 2>&1 || { echo "↷ skipping $r (not configured)"; continue; }
-        git push --force --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
+        gpush --force --follow-tags "$r" "$(git branch --show-current)" || failed="$failed $r"
     done
     if [ -n "$failed" ]; then echo "⚠️  Failed to force-push to:$failed"; exit 1; fi
     echo "✅ Latest commit and tags force-pushed to every configured remote"
