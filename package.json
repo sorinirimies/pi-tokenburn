@@ -17,6 +17,8 @@
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "audit": "bun audit",
+    "fuzz": "FUZZ_ITERS=20000 bun test tests/fuzz.test.ts --config=bunfig.fuzz.toml",
     "check": "nu scripts/ci/quality_gate.nu"
   },
   "peerDependencies": {

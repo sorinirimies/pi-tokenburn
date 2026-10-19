@@ -49,6 +49,14 @@ test-nu: _check-nu
     nu scripts/tests/run_all.nu
 
 # The full quality gate (typecheck + tests + pack check + nu tests) — what CI runs
+# Audit dependencies for known vulnerabilities (bun audit)
+audit: _check-bun
+    bun audit
+
+# Randomised robustness tests: just fuzz [iterations] [seed]. A failure prints its seed.
+fuzz iters="20000" seed="": _check-bun
+    FUZZ_ITERS={{iters}} {{ if seed != "" { "FUZZ_SEED=" + seed } else { "" } }} bun test tests/fuzz.test.ts --config=bunfig.fuzz.toml
+
 check: _check-nu _check-bun
     nu scripts/ci/quality_gate.nu
 

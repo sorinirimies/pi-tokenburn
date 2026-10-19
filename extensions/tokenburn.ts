@@ -537,8 +537,9 @@ const SPARK = "▁▂▃▄▅▆▇█";
 
 /** Horizontal bar of `value/max` over `width` cells, with 1/8-cell precision. */
 export function bar(value: number, max: number, width: number): string {
-	if (max <= 0 || value <= 0) return "";
-	const eighths = Math.max(1, Math.round((value / max) * width * 8));
+	if (!(max > 0) || !(value > 0) || !(width > 0)) return "";
+	// Capped at the full width: a value above `max` (or Infinity) must not build a giant string.
+	const eighths = Math.min(Math.floor(width) * 8, Math.max(1, Math.round((value / max) * width * 8)));
 	const full = Math.floor(eighths / 8);
 	return "█".repeat(full) + EIGHTHS[eighths % 8];
 }
@@ -559,10 +560,11 @@ const plain: Paint = (_k, t) => t;
 /** Two header rows for a column: [top, bottom]. */
 function columnLabels(p: SeriesPoint, unit: Unit): [string, string] {
 	const d = new Date(p.start);
-	if (unit === "day") return [pad2(d.getDate()), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d.getDay()]];
+	// `?? ""`: an invalid date (NaN) has no weekday or month name.
+	if (unit === "day") return [pad2(d.getDate()), ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][d.getDay()] ?? ""];
 	if (unit === "week") return [`${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, "wk"];
 	if (unit === "year") return [String(d.getFullYear()), ""];
-	return [MONTHS[d.getMonth()], String(d.getFullYear())];
+	return [MONTHS[d.getMonth()] ?? "", String(d.getFullYear())];
 }
 
 /**
