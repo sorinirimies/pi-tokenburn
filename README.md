@@ -183,6 +183,28 @@ just push-all       # push main to every configured remote (origin + the Gitea i
 
 **Coverage:** every `bun test` collects coverage (`bunfig.toml`) and **fails below 95% lines / 95% functions**. CI shows the table on the run page and uploads `lcov.info`.
 
+### Code layout
+
+One folder per feature under `extensions/features/`, each with its logic and its `/tokenburn` commands:
+
+```
+extensions/
+  tokenburn.ts            wiring only: pi events + the /tokenburn command
+  core/                   types, config, session-log parser (incremental cache), aggregation, filters + prices, paint
+  command/                parse + completions (pure), handler table, the Host handlers receive
+  features/
+    status-line/          footer text, optional panel, burn rate / cache hit / savings
+    report/               the /tokenburn summary and the column charts
+    budgets/              budgets, projection ("runs out Thu 14:05"), one-time warnings
+    breakdown/            tables per model / provider / project / session, current session
+    filter/               limit everything to a provider / model / project
+    pricing/              cost sources, price table
+    export/               csv / json
+    live/                 refresh scheduling
+```
+
+To add a command: add its kind to `command/parse.ts`, a handler in the owning feature's `commands.ts` (the `Handlers` type makes a missing one a compile error), and a test.
+
 CI scripts are [nushell](https://www.nushell.sh) (`scripts/`), the same ones locally and in GitHub / Gitea Actions.
 `just --list` shows every task.
 

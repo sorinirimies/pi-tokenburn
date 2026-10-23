@@ -1,10 +1,10 @@
 /** Usage tables (models / providers / projects / sessions) and the current-session summary. */
 import { homedir } from "node:os";
 import { basename } from "node:path";
-import { bar, type Paint } from "./chart.ts";
-import { formatCost, formatNum } from "./format.ts";
+import { bar, type Paint } from "../../core/paint.ts";
+import { formatCost, formatNum } from "../../core/format.ts";
 import { PERIOD_TITLE, cacheHitRatio, cacheSavings, sumRows, type GroupBy, type Period, type Row } from "./query.ts";
-import { pad2 } from "./time.ts";
+import { pad2 } from "../../core/time.ts";
 
 interface Col {
 	title: string;

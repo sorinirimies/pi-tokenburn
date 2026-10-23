@@ -36,3 +36,8 @@ export interface TokenBurnReport {
 
 export const STATUS_WINDOWS = ["hour", "today", "week", "month", "year", "total"] as const;
 export type Window = (typeof STATUS_WINDOWS)[number];
+
+export interface Rate {
+	tokensPerHour: number;
+	costPerHour: number;
+}

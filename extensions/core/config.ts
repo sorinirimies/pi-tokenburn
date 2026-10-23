@@ -2,7 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { sanitizeFilter, sanitizePrices, type PriceMode, type PriceTable, type UsageFilter } from "./pricing.ts";
+import { sanitizeFilter, sanitizePrices, type PriceMode, type PriceTable, type UsageFilter } from "./select.ts";
 import { STATUS_WINDOWS, type PeriodStats, type Window } from "./types.ts";
 
 export interface TokenBurnConfig {
