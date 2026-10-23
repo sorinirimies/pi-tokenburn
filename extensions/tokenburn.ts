@@ -15,7 +15,7 @@ import { createCoalescer } from "./lib/coalescer.ts";
 import { completions, parseCommand } from "./lib/command.ts";
 import { budgetsFor, freshConfig, getSessionsDir, isOverBudget, loadConfig, saveConfig, type TokenBurnConfig } from "./lib/config.ts";
 import { collectExport, formatExport } from "./lib/export.ts";
-import { budgetWarnings, burnRate, forecastLines } from "./lib/forecast.ts";
+import { budgetWarnings, burnRate, forecastLines, statusExtras } from "./lib/forecast.ts";
 import { formatCost, formatNum } from "./lib/format.ts";
 import { applyPricing, describeFilter, hasFilter, sanitizePrices, type UsageFilter, type UsageOptions } from "./lib/pricing.ts";
 import { collectPricing, renderPricing } from "./lib/pricing-report.ts";
@@ -72,7 +72,8 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 			const costText = theme.fg("dim", `(${formatCost(stat.cost)})`);
 			const filterText = describeFilter(config.filter);
 			const label = theme.fg("dim", `[${config.statusWindow}${filterText ? ` · ${filterText}` : ""}]`);
-			const rate = config.showRate && report.hour.tokens > 0 ? theme.fg("dim", ` · ${formatNum(burnRate(report.hour).tokensPerHour)}/h`) : "";
+			const extras = statusExtras(report, config, nowDate.getTime());
+			const rate = extras.length > 0 ? theme.fg("dim", ` · ${extras.join(" · ")}`) : "";
 
 			ctx.ui.setStatus("tokenburn", `${fire} ${tokensText} ${costText} ${label}${rate}`);
 		} else {
@@ -233,6 +234,18 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 					config.showRate = !config.showRate;
 					await persist();
 					note(`tokenburn burn rate in the status line: ${config.showRate ? "on" : "off"}`);
+					return;
+
+				case "hit":
+					config.showHit = !config.showHit;
+					await persist();
+					note(`tokenburn cache hit ratio in the status line: ${config.showHit ? "on" : "off"}`);
+					return;
+
+				case "saved":
+					config.showSaved = !config.showSaved;
+					await persist();
+					note(`tokenburn estimated cache savings in the status line: ${config.showSaved ? "on" : "off"}`);
 					return;
 
 				case "warn":

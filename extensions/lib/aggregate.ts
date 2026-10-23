@@ -12,6 +12,8 @@ const emptyStats = (): PeriodStats => ({
 	cacheWrite: 0,
 	cost: 0,
 	sessions: 0,
+	cacheBase: 0,
+	cacheActual: 0,
 });
 
 export const HOUR_MS = 3_600_000;
@@ -54,12 +56,17 @@ export async function collectUsage(
 		p.cacheRead += t.cacheRead;
 		p.cacheWrite += t.cacheWrite;
 		p.cost += t.cost;
+		if (t.input > 0 && t.costInput > 0) {
+			p.cacheBase += (t.cacheRead * t.costInput) / t.input;
+			p.cacheActual += t.costCacheRead;
+		}
 	};
 
 	for (const turns of await loadSelected(sessionsRoot, opts)) {
 		let maxTs = 0;
 		for (const t of turns) {
 			if (t.ts > maxTs) maxTs = t.ts;
+			if (report.firstTs === undefined || t.ts < report.firstTs) report.firstTs = t.ts;
 			add(report.total, t);
 			if (t.ts >= startOfYear) add(report.year, t);
 			if (t.ts >= startOfMonth) add(report.month, t);

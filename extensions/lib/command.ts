@@ -19,6 +19,8 @@ export type Command =
 	| { kind: "live" }
 	| { kind: "budget"; period: (typeof BUDGET_PERIODS)[number]; amount: number; isCost: boolean }
 	| { kind: "rate" }
+	| { kind: "hit" }
+	| { kind: "saved" }
 	| { kind: "session" }
 	| { kind: "table"; by: GroupBy; period: Period; filter: UsageFilter; limit?: number }
 	| { kind: "filter"; key?: FilterKey; value?: string; clear?: boolean }
@@ -29,10 +31,11 @@ export type Command =
 	| { kind: "invalid"; message: string };
 
 export const USAGE =
-	"Usage: /tokenburn [day|week|month|year|all] (status-bar period) · chart [day|week|month|year|all] · status <today|week|month|year|total> · models|providers|projects [hour|day|week|month|year|all] [provider=x model=x project=x] · sessions [period] [n] · session · filter [provider|model|project] <value|all> · export <csv|json> [period] [path] · warn <pct|off> · pricing · price <model> <in> <out> · rate · cycle · window · budget <day|week|month> <tokens|$cost> · cache · live · enable · disable";
+	"Usage: /tokenburn [hour|day|week|month|year|all] (status-bar period) · chart [day|week|month|year|all] · status <hour|today|week|month|year|total> · models|providers|projects [hour|day|week|month|year|all] [provider=x model=x project=x] · sessions [period] [n] · session · filter [provider|model|project] <value|all> · export <csv|json> [period] [path] · warn <pct|off> · pricing · price <model> <in> <out> · rate · hit · saved · cycle · window · budget <day|week|month> <tokens|$cost> · cache · live · enable · disable";
 
 /** Words that pick the status-bar period: `day` shows today, `all` shows the all-time total. */
 const WORD_TO_WINDOW: Record<string, Window> = {
+	hour: "hour",
 	day: "today",
 	today: "today",
 	week: "week",
@@ -109,6 +112,10 @@ export function parseCommand(args: string | undefined): Command {
 			return { kind: "live" };
 		case "rate":
 			return { kind: "rate" };
+		case "hit":
+			return { kind: "hit" };
+		case "saved":
+			return { kind: "saved" };
 		case "session":
 			return { kind: "session" };
 		case "model":
@@ -181,6 +188,7 @@ const CHART_SPAN: Record<ReportView, string> = {
 };
 
 const TOP_LEVEL: CompletionItem[] = [
+	{ value: "hour", label: "hour", description: "Status bar: last 60 minutes" },
 	{ value: "day", label: "day", description: "Status bar: today" },
 	{ value: "week", label: "week", description: "Status bar: this week" },
 	{ value: "month", label: "month", description: "Status bar: this month" },
@@ -199,6 +207,8 @@ const TOP_LEVEL: CompletionItem[] = [
 	{ value: "pricing", label: "pricing", description: "Where costs come from; price table status" },
 	{ value: "price ", label: "price", description: "Set a $/M-token price for a model" },
 	{ value: "rate", label: "rate", description: "Toggle the tokens/hour burn rate in the status line" },
+	{ value: "hit", label: "hit", description: "Toggle the cache hit ratio in the status line" },
+	{ value: "saved", label: "saved", description: "Toggle the estimated cache savings in the status line" },
 	{ value: "cycle", label: "cycle", description: "Rotate the status-bar period" },
 	{ value: "window", label: "window", description: "Toggle the panel below the editor" },
 	{ value: "budget ", label: "budget", description: "Set a day/week/month budget" },

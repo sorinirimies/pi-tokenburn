@@ -117,7 +117,7 @@ describe("pi's real autocomplete provider × the tokenburn command", () => {
 	it("offers day/week/month/year/all first, then the other options, with descriptions", async () => {
 		const s = await suggest("/tokenburn ");
 		const labels = s!.items.map((i) => i.label);
-		expect(labels.slice(0, 5)).toEqual(["day", "week", "month", "year", "all"]);
+		expect(labels.slice(0, 6)).toEqual(["hour", "day", "week", "month", "year", "all"]);
 		for (const l of ["chart", "status", "cycle", "window", "budget", "cache", "live", "enable", "disable"]) expect(labels).toContain(l);
 		for (const i of s!.items) expect(i.description && i.description.length).toBeGreaterThan(3);
 	});

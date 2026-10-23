@@ -17,6 +17,9 @@ export interface PeriodStats {
 	cacheWrite: number;
 	cost: number;
 	sessions: number;
+	/** What cache reads would have cost as plain input vs what they cost (turns with a known input price). */
+	cacheBase: number;
+	cacheActual: number;
 }
 
 export interface TokenBurnReport {
@@ -27,7 +30,9 @@ export interface TokenBurnReport {
 	month: PeriodStats;
 	year: PeriodStats;
 	total: PeriodStats;
+	/** Timestamp of the earliest turn counted (undefined when there is none). */
+	firstTs?: number;
 }
 
-export const STATUS_WINDOWS = ["today", "week", "month", "year", "total"] as const;
+export const STATUS_WINDOWS = ["hour", "today", "week", "month", "year", "total"] as const;
 export type Window = (typeof STATUS_WINDOWS)[number];

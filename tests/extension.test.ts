@@ -131,13 +131,13 @@ describe("pi-tokenburn chart + window commands", () => {
 		}
 	});
 
-	it("cycles today → week → month → year → total → today", async () => {
+	it("cycles today → week → month → year → total → hour → today", async () => {
 		const seen: string[] = [];
-		for (let i = 0; i < 5; i++) {
+		for (let i = 0; i < 6; i++) {
 			await command.handler("cycle", ctx());
 			seen.push(status.tokenburn.match(/\[(\w+)\]/)![1]);
 		}
-		expect(seen).toEqual(["week", "month", "year", "total", "today"]);
+		expect(seen).toEqual(["week", "month", "year", "total", "hour", "today"]);
 	});
 
 	it("`chart <view>` shows the report with the matching chart and leaves the status bar alone", async () => {

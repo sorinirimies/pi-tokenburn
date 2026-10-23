@@ -19,8 +19,12 @@ export interface TokenBurnConfig {
 	showStatus: boolean;
 	showWidget: boolean;
 	statusWindow: Window;
-	/** Show the burn rate (tokens/hour over the last 60 minutes) in the status line. */
+	/** Show the burn rate (tokens/hour averaged over the status window) in the status line. */
 	showRate: boolean;
+	/** Show the cache hit ratio of the status window in the status line. */
+	showHit: boolean;
+	/** Show the estimated cache savings of the status window in the status line. */
+	showSaved: boolean;
 	/** Notify once when a budget reaches this percentage (1 to 100); 0 turns warnings off. */
 	warnPct: number;
 	/** Only count usage matching these (case-insensitive substrings). Empty = everything. */
@@ -49,6 +53,8 @@ export const DEFAULT_CONFIG: TokenBurnConfig = {
 	showWidget: false,
 	statusWindow: "today",
 	showRate: true,
+	showHit: true,
+	showSaved: true,
 	warnPct: 80,
 	filter: {},
 	prices: {},
@@ -90,6 +96,8 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 				? parsed.statusWindow
 				: DEFAULT_CONFIG.statusWindow,
 			showRate: typeof parsed.showRate === "boolean" ? parsed.showRate : DEFAULT_CONFIG.showRate,
+			showHit: typeof parsed.showHit === "boolean" ? parsed.showHit : DEFAULT_CONFIG.showHit,
+			showSaved: typeof parsed.showSaved === "boolean" ? parsed.showSaved : DEFAULT_CONFIG.showSaved,
 			warnPct: sanitizeWarnPct(parsed.warnPct),
 			filter: sanitizeFilter(parsed.filter),
 			prices: sanitizePrices(parsed.prices),

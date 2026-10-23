@@ -109,7 +109,7 @@ describe("completions", () => {
 
 	it("completes second-level words with the full argument text", () => {
 		expect(completions("status ")!.map((i) => i.value)).toEqual([
-			"status today", "status week", "status month", "status year", "status total",
+			"status hour", "status today", "status week", "status month", "status year", "status total",
 		]);
 		expect(completions("status y")!.map((i) => i.value)).toEqual(["status year"]);
 		expect(completions("budget ")!.map((i) => i.value)).toEqual(["budget day ", "budget week ", "budget month "]);

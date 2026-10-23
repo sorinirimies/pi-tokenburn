@@ -54,7 +54,10 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 | `/tokenburn filter <provider\|model\|project> <value>` | Limit everything (status line, report, tables, export) to matching usage (case-insensitive substring). `filter` shows it, `filter all` clears it |
 | `/tokenburn export csv|json` | Optional `[period]` and `[path]` follow the format. Writes one row per day × provider × model × project (default `tokenburn-<period>.<format>` in the current directory) |
 | `/tokenburn warn <pct>` | Notify once when a budget reaches `pct` percent (default 80) and once when it is exceeded |
-| `/tokenburn rate` | Toggle the burn rate (`42k/h`, last 60 minutes) in the status line |
+| `/tokenburn rate` | Toggle the burn rate in the status line (`42k/h`: tokens per hour averaged over the status period) |
+| `/tokenburn hit` | Toggle the cache hit ratio (`95% hit`) in the status line |
+| `/tokenburn saved` | Toggle the estimated cache savings (`~$12.40 saved`) in the status line |
+| `/tokenburn hour` | Show the last 60 minutes in the status line (joins `day`, `week`, `month`, `year`, `all`) |
 | `/tokenburn pricing` | Where costs come from (session logs vs your price table) and which models are unpriced |
 | `/tokenburn price <model> <in> <out>` | Set a price in $ per million tokens (key `model` or `provider/model`); `price remove <model>` deletes it. `pricing mode <fill\|override>`: use the table only where the log has no cost (default), or always |
 | `/tokenburn window` | Toggle the panel below the editor |

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import tokenBurn, {
 	applyPricing, budgetWarnings, burnRate, cacheHitRatio, cacheSavings, clearCache, collectExport, collectGroups, collectPricing, collectUsage,
 	completions, csvCell, describeFilter, forecastLines, formatExport, formatWhen, freshConfig, hasFilter, matchesFilter, nextBucket, parseCommand,
-	periodStart, project, renderPricing, renderTable, sanitizeFilter, sanitizePrices, sanitizeWarnPct, selectTurns, sessionSummary, shortPath, stamp, sumRows,
+	periodStart, project, statSavings, statusExtras, windowRate, windowStart, renderPricing, renderTable, sanitizeFilter, sanitizePrices, sanitizeWarnPct, selectTurns, sessionSummary, shortPath, stamp, sumRows,
 	__loadAllForTests,
 } from "../extensions/tokenburn.ts";
 
@@ -318,6 +318,43 @@ describe("tokenburn features", () => {
 		});
 	});
 
+	describe("status line extras follow the status window", () => {
+		const stat = (o: any = {}) => ({ tokens: 2400, cost: 1, input: 10, output: 5, cacheRead: 90, cacheWrite: 0, sessions: 1, cacheBase: 0.5, cacheActual: 0.1, ...o });
+		const n = NOW.getTime();
+		const rep = (o: any = {}) => ({ hour: stat({ tokens: 100 }), today: stat(), week: stat({ tokens: 4800 }), month: stat(), year: stat(), total: stat(), firstTs: n - 24 * 3_600_000, ...o }) as any;
+		const cfg = (o: any = {}) => ({ ...freshConfig(), ...o });
+
+		it("windowStart", () => {
+			expect(windowStart("hour", n)).toBe(n - 3_600_000);
+			expect(windowStart("total", n)).toBe(0);
+			expect(windowStart("today", n)).toBe(new Date(2026, 9, 14).getTime());
+			expect(windowStart("week", n)).toBe(new Date(2026, 9, 12).getTime());
+		});
+
+		it("rate is averaged over the window, from the first turn, at least one hour", () => {
+			expect(windowRate(stat({ tokens: 100 }), "hour", undefined, n).tokensPerHour).toBe(100);
+			expect(windowRate(stat({ tokens: 1200 }), "today", n - 12 * 3_600_000, n).tokensPerHour).toBe(100); // 12h since midnight
+			expect(windowRate(stat({ tokens: 1200 }), "week", n - 6 * 3_600_000, n).tokensPerHour).toBe(200); // first turn 6h ago
+			expect(windowRate(stat({ tokens: 50 }), "today", n - 60_000, n).tokensPerHour).toBe(50); // < 1h floors at 1h
+			expect(windowRate(stat({ tokens: 50, cost: 3 }), "total", undefined, n).costPerHour).toBe(3);
+		});
+
+		it("shows rate, hit ratio and savings for the selected window, each toggleable", () => {
+			expect(statSavings(stat())).toBeCloseTo(0.4, 9);
+			expect(statusExtras(rep(), cfg({ statusWindow: "hour" }), n)).toEqual(["100/h", "90% hit", "~$0.40 saved"]);
+			expect(statusExtras(rep(), cfg({ statusWindow: "week" }), n)[0]).toBe("200/h"); // 4800 tokens over the 24h since the first turn
+			expect(statusExtras(rep(), cfg({ statusWindow: "hour", showRate: false }), n)).toEqual(["90% hit", "~$0.40 saved"]);
+			expect(statusExtras(rep(), cfg({ statusWindow: "hour", showHit: false }), n)).toEqual(["100/h", "~$0.40 saved"]);
+			expect(statusExtras(rep(), cfg({ statusWindow: "hour", showSaved: false }), n)).toEqual(["100/h", "90% hit"]);
+			expect(statusExtras(rep(), cfg({ statusWindow: "hour", showRate: false, showHit: false, showSaved: false }), n)).toEqual([]);
+		});
+
+		it("omits what is meaningless (no tokens, no prompt, no savings)", () => {
+			const empty = stat({ tokens: 0, input: 0, cacheRead: 0, cacheBase: 0, cacheActual: 0 });
+			expect(statusExtras(rep({ hour: empty }), cfg({ statusWindow: "hour" }), n)).toEqual([]);
+		});
+	});
+
 	describe("export", () => {
 		it("aggregates per day x provider x model x project, sorted", async () => {
 			const rows = await collectExport(dir, "all", NOW);
@@ -383,12 +420,15 @@ describe("tokenburn features", () => {
 			expect(parseCommand("price remove Llama")).toEqual({ kind: "price", model: "Llama", remove: true });
 			for (const bad of ["price", "price m", "price m 1", "price m x 2", "price m -1 2"]) expect(parseCommand(bad).kind).toBe("invalid");
 			expect(parseCommand("rate")).toEqual({ kind: "rate" });
+			expect(parseCommand("hit")).toEqual({ kind: "hit" });
+			expect(parseCommand("saved")).toEqual({ kind: "saved" });
+			expect(parseCommand("hour")).toEqual({ kind: "status", window: "hour" });
 			expect(parseCommand("session")).toEqual({ kind: "session" });
 		});
 
 		it("completes the new commands and their arguments", () => {
 			const top = completions("")!.map((i) => i.label);
-			for (const w of ["models", "providers", "projects", "sessions", "session", "filter", "export", "warn", "pricing", "price", "rate"]) expect(top).toContain(w);
+			for (const w of ["models", "providers", "projects", "sessions", "session", "filter", "export", "warn", "pricing", "price", "rate", "hit", "saved", "hour"]) expect(top).toContain(w);
 			expect(completions("models ")!.map((i) => i.label)).toContain("hour");
 			expect(completions("models ")!.map((i) => i.label)).not.toContain("today");
 			expect(completions("filter ")!.map((i) => i.label)).toEqual(["provider", "model", "project", "all"]);
@@ -510,6 +550,25 @@ describe("tokenburn features", () => {
 			expect(await run("warn 60")).toContain("60%");
 		});
 
+		it("`hit` and `saved` toggle the cache hit ratio and savings in the status line; `hour` is a status window", async () => {
+			await run("hour");
+			expect(status).toContain("[hour]");
+			expect(status).toMatch(/\d+% hit/);
+			expect(status).toContain("saved");
+			expect(await run("hit")).toContain("off");
+			expect(status).not.toContain("% hit");
+			expect(status).toContain("saved");
+			expect(await run("saved")).toContain("off");
+			expect(status).not.toContain("saved");
+			expect(await run("hit")).toContain("on");
+			expect(await run("saved")).toContain("on");
+			expect(status).toContain("% hit");
+			const saved = JSON.parse(readFileSync(join(agent, "tokenburn.json"), "utf8"));
+			expect(saved).toMatchObject({ showHit: true, showSaved: true });
+			await run("day");
+			expect(status).toContain("[today]");
+		});
+
 		it("pricing: set, show, mode, remove", async () => {
 			expect(await run("pricing")).toContain("price table: empty");
 			expect(await run("price local/llama 1 2")).toContain("price for local/llama set");
@@ -523,12 +582,12 @@ describe("tokenburn features", () => {
 		});
 
 		it("loads filter, prices, priceMode, warnPct and showRate from the config file", async () => {
-			writeFileSync(join(agent, "tokenburn.json"), JSON.stringify({ filter: { model: "x" }, prices: { m: { input: 1, output: 2 } }, priceMode: "override", warnPct: 50, showRate: false }));
+			writeFileSync(join(agent, "tokenburn.json"), JSON.stringify({ filter: { model: "x" }, prices: { m: { input: 1, output: 2 } }, priceMode: "override", warnPct: 50, showRate: false, showHit: false, showSaved: false }));
 			await handlers.session_start({}, ctx());
 			expect(status).toContain("model=x");
 			await run("filter clear");
 			const saved = JSON.parse(readFileSync(join(agent, "tokenburn.json"), "utf8"));
-			expect(saved).toMatchObject({ priceMode: "override", warnPct: 50, showRate: false, prices: { m: { input: 1, output: 2, cacheRead: 1, cacheWrite: 1 } } });
+			expect(saved).toMatchObject({ priceMode: "override", warnPct: 50, showRate: false, showHit: false, showSaved: false, prices: { m: { input: 1, output: 2, cacheRead: 1, cacheWrite: 1 } } });
 		});
 	});
 });

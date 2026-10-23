@@ -65,6 +65,12 @@ const HEAD_BYTES = 256;
 export const CHUNK_BYTES = 1 << 20;
 
 /** A Turn from one JSONL line, or undefined when it carries no usage. */
+/** A finite number, else 0 (logs can hold 1e999, strings, junk). */
+const finite = (v: unknown): number => {
+	const n = Number(v);
+	return Number.isFinite(n) ? n : 0;
+};
+
 function turnFromLine(line: Buffer, meta: Meta): Turn | undefined {
 	if (meta.cwd === undefined && line.includes('"type":"session"')) {
 		try {
@@ -84,13 +90,13 @@ function turnFromLine(line: Buffer, meta: Meta): Turn | undefined {
 		if (!Number.isFinite(ts)) return undefined;
 		return {
 			ts,
-			input: Number(usage.input) || 0,
-			output: Number(usage.output) || 0,
-			cacheRead: Number(usage.cacheRead) || 0,
-			cacheWrite: Number(usage.cacheWrite) || 0,
-			cost: Number(usage.cost?.total) || 0,
-			costInput: Number(usage.cost?.input) || 0,
-			costCacheRead: Number(usage.cost?.cacheRead) || 0,
+			input: finite(usage.input),
+			output: finite(usage.output),
+			cacheRead: finite(usage.cacheRead),
+			cacheWrite: finite(usage.cacheWrite),
+			cost: finite(usage.cost?.total),
+			costInput: finite(usage.cost?.input),
+			costCacheRead: finite(usage.cost?.cacheRead),
 			provider: String(obj.message?.provider ?? "unknown"),
 			model: String(obj.message?.model ?? "unknown"),
 			project: meta.cwd ?? basename(dirname(meta.file)),
