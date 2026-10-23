@@ -232,7 +232,10 @@ export function completions(prefix: string): CompletionItem[] | null {
 	else if (/^(models?|providers?|projects?|sessions|top) /.test(text)) {
 		const head = text.split(" ")[0];
 		pool = sub(head, Object.keys(PERIOD_ALIASES).filter((w) => w !== "today" && w !== "total"), (w) => `Usage ${w === "all" ? "over all time" : `for ${w}`}`);
-	} else if (text.startsWith("filter ") && !/^filter \S+ /.test(text)) pool = sub("filter", [...FILTER_KEYS_LIST, "all"], (w) => (w === "all" ? "Clear the filter" : `Only this ${w}`), " ");
+	} else if (text.startsWith("filter ") && !/^filter \S+ /.test(text)) pool = [
+			...sub("filter", FILTER_KEYS_LIST, (w) => `Only this ${w}`, " "), // still needs a value
+			...sub("filter", ["all"], () => "Clear the filter"), // complete as it is
+		];
 	else if (text.startsWith("export ") && !/^export \S+ /.test(text)) pool = sub("export", EXPORT_FORMATS, (w) => `Export as ${w}`);
 	else if (/^(report|chart) /.test(text)) {
 		const head = text.split(" ")[0];

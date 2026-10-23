@@ -432,6 +432,10 @@ describe("tokenburn features", () => {
 			expect(completions("models ")!.map((i) => i.label)).toContain("hour");
 			expect(completions("models ")!.map((i) => i.label)).not.toContain("today");
 			expect(completions("filter ")!.map((i) => i.label)).toEqual(["provider", "model", "project", "all"]);
+			// keys wait for a value (trailing space); `all` is already a complete command (no trailing space)
+			expect(completions("filter ")!.map((i) => i.value)).toEqual(["filter provider ", "filter model ", "filter project ", "filter all"]);
+			expect(completions("filter a")!.map((i) => i.value)).toEqual(["filter all"]);
+			expect(parseCommand("filter all")).toEqual({ kind: "filter", clear: true });
 			expect(completions("export ")!.map((i) => i.label)).toEqual(["csv", "json"]);
 			expect(completions("export csv ")).toBeNull();
 		});
