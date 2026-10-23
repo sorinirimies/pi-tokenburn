@@ -81,7 +81,7 @@ describe("pi's real autocomplete provider × the tokenburn command", () => {
 				// unless it is an intentionally unfinished `status ` / `budget ` / `report ` stem
 				const argText = out.lines[0].replace(/^\/tokenburn\s*/, "");
 				const parsed = parseCommand(argText);
-				const stem = /^(status|report|chart)\s*$/.test(argText) || /^budget\s*((day|week|month)\s*)?$/.test(argText);
+				const stem = /^(status|report|chart|filter|export|warn|price)\s*$/.test(argText) || /^filter (provider|model|project)\s*$/.test(argText) || /^export (csv|json)\s*$/.test(argText) || /^budget\s*((day|week|month)\s*)?$/.test(argText);
 				expect(parsed.kind === "invalid" ? stem : true).toBe(true);
 				applied++;
 			}

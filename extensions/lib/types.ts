@@ -20,6 +20,8 @@ export interface PeriodStats {
 }
 
 export interface TokenBurnReport {
+	/** Rolling last 60 minutes (burn rate). */
+	hour: PeriodStats;
 	today: PeriodStats;
 	week: PeriodStats;
 	month: PeriodStats;

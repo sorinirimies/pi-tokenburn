@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { sanitizeFilter, sanitizePrices, type PriceMode, type PriceTable, type UsageFilter } from "./pricing.ts";
 import { STATUS_WINDOWS, type PeriodStats, type Window } from "./types.ts";
 
 export interface TokenBurnConfig {
@@ -18,6 +19,16 @@ export interface TokenBurnConfig {
 	showStatus: boolean;
 	showWidget: boolean;
 	statusWindow: Window;
+	/** Show the burn rate (tokens/hour over the last 60 minutes) in the status line. */
+	showRate: boolean;
+	/** Notify once when a budget reaches this percentage (1 to 100); 0 turns warnings off. */
+	warnPct: number;
+	/** Only count usage matching these (case-insensitive substrings). Empty = everything. */
+	filter: UsageFilter;
+	/** Price table in $ per million tokens, keyed by `model` or `provider/model`. */
+	prices: PriceTable;
+	/** `fill`: use the table only where the log has no cost. `override`: table wins over the log. */
+	priceMode: PriceMode;
 	budgets: {
 		dayTokens?: number;
 		weekTokens?: number;
@@ -37,6 +48,11 @@ export const DEFAULT_CONFIG: TokenBurnConfig = {
 	showStatus: true,
 	showWidget: false,
 	statusWindow: "today",
+	showRate: true,
+	warnPct: 80,
+	filter: {},
+	prices: {},
+	priceMode: "fill",
 	budgets: {},
 };
 
@@ -73,6 +89,11 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 			statusWindow: (STATUS_WINDOWS as readonly string[]).includes(parsed.statusWindow)
 				? parsed.statusWindow
 				: DEFAULT_CONFIG.statusWindow,
+			showRate: typeof parsed.showRate === "boolean" ? parsed.showRate : DEFAULT_CONFIG.showRate,
+			warnPct: sanitizeWarnPct(parsed.warnPct),
+			filter: sanitizeFilter(parsed.filter),
+			prices: sanitizePrices(parsed.prices),
+			priceMode: parsed.priceMode === "override" ? "override" : "fill",
 			budgets: sanitizeBudgets(parsed.budgets),
 		};
 	} catch {
@@ -84,6 +105,12 @@ export async function loadConfig(): Promise<TokenBurnConfig> {
 export function sanitizeRefreshMs(value: unknown): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONFIG.refreshMs;
 	return Math.min(60_000, Math.max(250, Math.round(value)));
+}
+
+/** Warn threshold: a finite number 1..100, 0 = off, anything else the default. */
+export function sanitizeWarnPct(value: unknown): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_CONFIG.warnPct;
+	return value <= 0 ? 0 : Math.min(100, Math.round(value));
 }
 
 const BUDGET_KEYS = ["dayTokens", "weekTokens", "monthTokens", "dayCost", "weekCost", "monthCost"] as const;
@@ -101,7 +128,7 @@ export function sanitizeBudgets(value: unknown): TokenBurnConfig["budgets"] {
 
 /** A config that shares no mutable state with DEFAULT_CONFIG. */
 export function freshConfig(): TokenBurnConfig {
-	return { ...DEFAULT_CONFIG, budgets: {} };
+	return { ...DEFAULT_CONFIG, budgets: {}, filter: {}, prices: {} };
 }
 
 export async function saveConfig(cfg: TokenBurnConfig): Promise<void> {

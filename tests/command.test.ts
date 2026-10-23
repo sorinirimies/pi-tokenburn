@@ -98,10 +98,10 @@ describe("completions", () => {
 	});
 
 	it("filters by prefix", () => {
-		expect(completions("mo")!.map((i) => i.value)).toEqual(["month"]);
+		expect(completions("mo")!.map((i) => i.value)).toEqual(["month", "models "]);
 		expect(completions("y")!.map((i) => i.value)).toEqual(["year"]);
 		expect(completions("ch")!.map((i) => i.value)).toEqual(["chart "]);
-		expect(completions("e")!.map((i) => i.value)).toEqual(["enable"]);
+		expect(completions("en")!.map((i) => i.value)).toEqual(["enable"]);
 		expect(completions("d")!.map((i) => i.value)).toEqual(["day", "disable"]);
 		expect(completions("li")!.map((i) => i.value)).toEqual(["live"]);
 		expect(completions("zzz")).toBeNull();

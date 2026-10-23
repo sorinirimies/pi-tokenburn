@@ -7,12 +7,20 @@
  * This file wires them to pi and re-exports the public API.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { collectAllSeries, collectSeries, collectUsage, DEFAULT_COUNT } from "./lib/aggregate.ts";
 import { renderChart, themePaint } from "./lib/chart.ts";
 import { createCoalescer } from "./lib/coalescer.ts";
 import { completions, parseCommand } from "./lib/command.ts";
 import { budgetsFor, freshConfig, getSessionsDir, isOverBudget, loadConfig, saveConfig, type TokenBurnConfig } from "./lib/config.ts";
+import { collectExport, formatExport } from "./lib/export.ts";
+import { budgetWarnings, burnRate, forecastLines } from "./lib/forecast.ts";
 import { formatCost, formatNum } from "./lib/format.ts";
+import { applyPricing, describeFilter, hasFilter, sanitizePrices, type UsageFilter, type UsageOptions } from "./lib/pricing.ts";
+import { collectPricing, renderPricing } from "./lib/pricing-report.ts";
+import { cacheHitRatio, cacheSavings, collectGroups, sumRows } from "./lib/query.ts";
+import { renderTable, sessionSummary } from "./lib/table.ts";
 import { STATUS_WINDOWS, type PeriodStats, type Window } from "./lib/types.ts";
 
 export * from "./lib/types.ts";
@@ -24,9 +32,24 @@ export * from "./lib/aggregate.ts";
 export * from "./lib/chart.ts";
 export * from "./lib/coalescer.ts";
 export * from "./lib/command.ts";
+export * from "./lib/pricing.ts";
+export * from "./lib/pricing-report.ts";
+export * from "./lib/query.ts";
+export * from "./lib/forecast.ts";
+export * from "./lib/table.ts";
+export * from "./lib/export.ts";
 
 export default function tokenBurnExtension(pi: ExtensionAPI) {
 	let config: TokenBurnConfig = freshConfig();
+	/** Budget warnings already shown (id = budget + period bucket + level): each shows once. */
+	const warned = new Set<string>();
+
+	/** Config filter (+ price table) merged with per-command filters. */
+	const usageOpts = (extra?: UsageFilter): UsageOptions => ({
+		filter: { ...config.filter, ...extra },
+		prices: config.prices,
+		priceMode: config.priceMode,
+	});
 
 	const updateUI = async (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) return;
@@ -36,7 +59,8 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 			ctx.ui.setWidget("tokenburn-panel", []);
 			return;
 		}
-		const report = await collectUsage(getSessionsDir(), new Date(), config.includeCache);
+		const nowDate = new Date();
+		const report = await collectUsage(getSessionsDir(), nowDate, config.includeCache, usageOpts());
 		const theme = ctx.ui.theme;
 
 		// Status bar update
@@ -46,11 +70,20 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 			const fire = isOver ? theme.fg("error", "🔥 OVER BUDGET") : theme.fg("warning", "🔥");
 			const tokensText = theme.fg(isOver ? "error" : "accent", formatNum(stat.tokens));
 			const costText = theme.fg("dim", `(${formatCost(stat.cost)})`);
-			const label = theme.fg("dim", `[${config.statusWindow}]`);
+			const filterText = describeFilter(config.filter);
+			const label = theme.fg("dim", `[${config.statusWindow}${filterText ? ` · ${filterText}` : ""}]`);
+			const rate = config.showRate && report.hour.tokens > 0 ? theme.fg("dim", ` · ${formatNum(burnRate(report.hour).tokensPerHour)}/h`) : "";
 
-			ctx.ui.setStatus("tokenburn", `${fire} ${tokensText} ${costText} ${label}`);
+			ctx.ui.setStatus("tokenburn", `${fire} ${tokensText} ${costText} ${label}${rate}`);
 		} else {
 			ctx.ui.setStatus("tokenburn", "");
+		}
+
+		// One-time budget warnings (once per budget, period and level).
+		for (const w of budgetWarnings(report, config, nowDate.getTime())) {
+			if (warned.has(w.id)) continue;
+			warned.add(w.id);
+			ctx.ui.notify(w.message, "warning");
 		}
 
 		// Widget panel update
@@ -196,6 +229,95 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 					note(`tokenburn live refresh ${config.liveRefresh ? "on (after each assistant message)" : "off (only when a turn ends)"}`);
 					return;
 
+				case "rate":
+					config.showRate = !config.showRate;
+					await persist();
+					note(`tokenburn burn rate in the status line: ${config.showRate ? "on" : "off"}`);
+					return;
+
+				case "warn":
+					config.warnPct = cmd.pct;
+					warned.clear();
+					await persist();
+					note(cmd.pct === 0 ? "tokenburn budget warnings: off" : `tokenburn: warning when a budget reaches ${cmd.pct}%`);
+					return;
+
+				case "filter": {
+					if (cmd.clear) config.filter = {};
+					else if (cmd.key) {
+						if (cmd.value === undefined) delete config.filter[cmd.key];
+						else config.filter[cmd.key] = cmd.value;
+					} else {
+						ctx.ui.notify(hasFilter(config.filter) ? `tokenburn filter: ${describeFilter(config.filter)}` : "tokenburn filter: none (all providers, models and projects)", "info");
+						return;
+					}
+					await persist();
+					note(hasFilter(config.filter) ? `tokenburn filter: ${describeFilter(config.filter)}` : "tokenburn filter cleared: showing everything");
+					return;
+				}
+
+				case "table": {
+					const opts = usageOpts(cmd.filter);
+					const rows = await collectGroups(getSessionsDir(), cmd.by, cmd.period, new Date(), config.includeCache, opts);
+					const paint = config.chartColor ? themePaint(ctx.ui.theme) : undefined;
+					ctx.ui.notify(renderTable(cmd.by, rows, cmd.period, { limit: cmd.limit, filterText: describeFilter(opts.filter), paint }).join("\n"), "info");
+					return;
+				}
+
+				case "session": {
+					const file = ctx.sessionManager?.getSessionFile?.();
+					if (!file) {
+						ctx.ui.notify("tokenburn: this session has no log file yet (in-memory session)", "info");
+						return;
+					}
+					const root = getSessionsDir();
+					const now = new Date();
+					const [rows, report] = await Promise.all([
+						collectGroups(root, "session", "all", now, config.includeCache, usageOpts()),
+						collectUsage(root, now, config.includeCache, usageOpts()),
+					]);
+					ctx.ui.notify(sessionSummary(file, rows.find((r) => r.key === file), report.today.cost), "info");
+					return;
+				}
+
+				case "export": {
+					const now = new Date();
+					const rows = await collectExport(getSessionsDir(), cmd.period, now, usageOpts());
+					const path = resolve(ctx.cwd ?? process.cwd(), cmd.path ?? `tokenburn-${cmd.period}.${cmd.format}`);
+					try {
+						await writeFile(path, formatExport(rows, cmd.format), "utf8");
+						ctx.ui.notify(`tokenburn: exported ${rows.length} rows (${cmd.period}) to ${path}`, "info");
+					} catch (e) {
+						ctx.ui.notify(`tokenburn: export failed: ${(e as Error).message}`, "warning");
+					}
+					return;
+				}
+
+				case "pricing": {
+					if (cmd.mode) {
+						config.priceMode = cmd.mode;
+						await persist();
+					}
+					const rep = await collectPricing(getSessionsDir(), config.prices, config.priceMode, config.filter);
+					ctx.ui.notify(renderPricing(rep, config.prices, config.priceMode).join("\n"), "info");
+					return;
+				}
+
+				case "price": {
+					if (cmd.remove) {
+						const had = cmd.model in config.prices;
+						delete config.prices[cmd.model];
+						await persist();
+						note(had ? `tokenburn: removed price for ${cmd.model}` : `tokenburn: no price for ${cmd.model}`);
+						return;
+					}
+					const next = sanitizePrices({ [cmd.model]: { input: cmd.input, output: cmd.output, cacheRead: cmd.cacheRead, cacheWrite: cmd.cacheWrite } });
+					Object.assign(config.prices, next);
+					await persist();
+					note(`tokenburn: price for ${cmd.model} set ($/M in ${cmd.input}, out ${cmd.output}); mode ${config.priceMode}`);
+					return;
+				}
+
 				case "invalid":
 					ctx.ui.notify(cmd.message, "warning");
 					return;
@@ -203,15 +325,16 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 				case "report": {
 					const root = getSessionsDir();
 					const now = new Date();
-					const report = await collectUsage(root, now, config.includeCache);
+					const opts = usageOpts();
+					const report = await collectUsage(root, now, config.includeCache, opts);
 					const paint = config.chartColor ? themePaint(ctx.ui.theme) : undefined;
 
 					let chart: string[];
 					if (cmd.view === "all") {
-						const all = await collectAllSeries(root, now, config.includeCache);
+						const all = await collectAllSeries(root, now, config.includeCache, opts);
 						chart = renderChart(all.series, all.unit, { paint, title: "All time" });
 					} else {
-						const series = await collectSeries(root, cmd.view, DEFAULT_COUNT[cmd.view], now, config.includeCache);
+						const series = await collectSeries(root, cmd.view, DEFAULT_COUNT[cmd.view], now, config.includeCache, opts);
 						const budgetWindow: Window | undefined =
 							cmd.view === "day" ? "today" : cmd.view === "year" ? undefined : cmd.view;
 						chart = renderChart(series, cmd.view, {
@@ -220,12 +343,23 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 						});
 					}
 
+					const models = sumRows(await collectGroups(root, "model", "all", now, config.includeCache, opts));
+					const rate = burnRate(report.hour);
+					const extra = [
+						`burn rate: ${formatNum(rate.tokensPerHour)} tokens/h · ${formatCost(rate.costPerHour)}/h (last 60 min)`,
+						...(models.cacheRead + models.cacheWrite > 0
+							? [`cache: ${Math.round(cacheHitRatio(models) * 100)}% of prompt tokens read from cache${cacheSavings(models) > 0 ? ` · saved ~${formatCost(cacheSavings(models))}` : ""}`]
+							: []),
+						...forecastLines(report, config, now.getTime()),
+					];
+					const filterText = describeFilter(opts.filter);
+
 					const row = (name: string, p: PeriodStats) =>
 						`${name.padEnd(10)} ${formatNum(p.tokens).padStart(8)} tokens ${formatCost(p.cost).padStart(9)} · in:${formatNum(p.input)} out:${formatNum(p.output)} cache:${formatNum(p.cacheRead + p.cacheWrite)} · ${p.sessions} sess`;
 					const rule = "─".repeat(60);
 					ctx.ui.notify(
 						[
-							"🔥 TokenBurn Report",
+							`🔥 TokenBurn Report${filterText ? ` · ${filterText}` : ""}`,
 							rule,
 							row("Today", report.today),
 							row("This Week", report.week),
@@ -235,7 +369,9 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 							rule,
 							...chart,
 							rule,
-							"chart <view> · <view> sets the status bar · cycle · window · budget · cache · live · on|off",
+							...extra,
+							rule,
+							"models · providers · projects · sessions · session · filter · export · pricing · chart <view> · <view> sets the status bar · cycle · window · budget · cache · live · on|off",
 						].join("\n"),
 						"info",
 					);

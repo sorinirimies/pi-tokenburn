@@ -4,7 +4,7 @@
  */
 import { readdirSync, statSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export interface Turn {
 	ts: number;
@@ -13,6 +13,21 @@ export interface Turn {
 	cacheRead: number;
 	cacheWrite: number;
 	cost: number;
+	/** Cost split, used to estimate what prompt caching saved. */
+	costInput: number;
+	costCacheRead: number;
+	provider: string;
+	model: string;
+	/** Working directory of the session (falls back to the session directory name). */
+	project: string;
+	/** Session file path. */
+	session: string;
+}
+
+/** Per-file context for a parse: where the file is and the cwd from its header line. */
+interface Meta {
+	file: string;
+	cwd?: string;
 }
 
 /** What was read from disk, for tests and tuning: refreshes must cost O(new bytes). */
@@ -37,6 +52,7 @@ interface FileEntry {
 	turns: Turn[];
 	/** Turn from an unterminated final line; counted now, re-parsed once the line completes. */
 	tail: Turn[];
+	cwd?: string;
 	/** First bytes of the file, to notice a rewrite. */
 	head: Buffer;
 	/** The bytes just before `offset`, same purpose. */
@@ -49,7 +65,16 @@ const HEAD_BYTES = 256;
 export const CHUNK_BYTES = 1 << 20;
 
 /** A Turn from one JSONL line, or undefined when it carries no usage. */
-function turnFromLine(line: Buffer): Turn | undefined {
+function turnFromLine(line: Buffer, meta: Meta): Turn | undefined {
+	if (meta.cwd === undefined && line.includes('"type":"session"')) {
+		try {
+			const h = JSON.parse(line.toString("utf8"));
+			if (h.type === "session" && typeof h.cwd === "string") meta.cwd = h.cwd;
+		} catch {
+			/* not a header */
+		}
+		return undefined;
+	}
 	if (!line.includes('"usage"')) return undefined; // most lines: skip without a JSON parse
 	try {
 		const obj = JSON.parse(line.toString("utf8"));
@@ -64,6 +89,12 @@ function turnFromLine(line: Buffer): Turn | undefined {
 			cacheRead: Number(usage.cacheRead) || 0,
 			cacheWrite: Number(usage.cacheWrite) || 0,
 			cost: Number(usage.cost?.total) || 0,
+			costInput: Number(usage.cost?.input) || 0,
+			costCacheRead: Number(usage.cost?.cacheRead) || 0,
+			provider: String(obj.message?.provider ?? "unknown"),
+			model: String(obj.message?.model ?? "unknown"),
+			project: meta.cwd ?? basename(dirname(meta.file)),
+			session: meta.file,
 		};
 	} catch {
 		return undefined;
@@ -82,6 +113,7 @@ async function scan(
 	start: number,
 	end: number,
 	chunkSize: number,
+	meta: Meta,
 ): Promise<{ turns: Turn[]; consumed: number; rest: Buffer }> {
 	const turns: Turn[] = [];
 	const buf = Buffer.allocUnsafe(Math.min(chunkSize, Math.max(1, end - start)));
@@ -96,7 +128,7 @@ async function scan(
 		const data = carry.length > 0 ? Buffer.concat([carry, buf.subarray(0, n)]) : buf.subarray(0, n);
 		let lineStart = 0;
 		for (let nl = data.indexOf(10, lineStart); nl !== -1; nl = data.indexOf(10, lineStart)) {
-			const t = turnFromLine(data.subarray(lineStart, nl));
+			const t = turnFromLine(data.subarray(lineStart, nl), meta);
 			if (t) turns.push(t);
 			lineStart = nl + 1;
 		}
@@ -142,15 +174,17 @@ async function refreshEntry(
 		if (incremental) stats.incrementalParses++;
 		else stats.fullParses++;
 
-		const r = await scan(fd, start, st.size, chunkSize);
+		const meta: Meta = { file, cwd: incremental ? prev!.cwd : undefined };
+		const r = await scan(fd, start, st.size, chunkSize, meta);
 		for (const t of r.turns) turns.push(t);
-		const tailTurn = r.rest.length > 0 ? turnFromLine(r.rest) : undefined;
+		const tailTurn = r.rest.length > 0 ? turnFromLine(r.rest, meta) : undefined;
 		return {
 			size: st.size,
 			mtimeMs: st.mtimeMs,
 			offset: r.consumed,
 			turns,
 			tail: tailTurn ? [tailTurn] : [],
+			cwd: meta.cwd,
 			head: incremental ? prev!.head : await bytesAt(fd, 0, Math.min(HEAD_BYTES, st.size)),
 			guard: await bytesAt(fd, Math.max(0, r.consumed - GUARD_BYTES), Math.min(GUARD_BYTES, r.consumed)),
 		};

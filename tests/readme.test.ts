@@ -9,6 +9,16 @@ const PLACEHOLDERS: Record<string, string[]> = {
 	"<window>": ["today", "week", "month", "year", "total"],
 	"<tokens>": ["5000000"],
 	"$<cost>": ["$50"],
+	"<value>": ["anthropic"],
+	"<pct>": ["90"],
+	"<model>": ["llama"],
+	"<in>": ["1"],
+	"<out>": ["2"],
+	"[cacheRead]": [""],
+	"[cacheWrite]": [""],
+	"[period]": [""],
+	"[n]": [""],
+	"[path]": [""],
 };
 
 /** `/tokenburn ...` spans from the README, with `a|b` alternatives and <placeholders> expanded. */
@@ -45,7 +55,7 @@ describe("every command documented in the README works", () => {
 	let notes: string[];
 	let prev: string | undefined;
 	const theme = { fg: (_c: string, t: string) => t };
-	const ctx = () => ({ hasUI: true, ui: { theme, setStatus() {}, setWidget() {}, notify: (m: string) => notes.push(m) } });
+	const ctx = () => ({ hasUI: true, cwd: dir, ui: { theme, setStatus() {}, setWidget() {}, notify: (m: string) => notes.push(m) } });
 
 	beforeEach(async () => {
 		clearCache();

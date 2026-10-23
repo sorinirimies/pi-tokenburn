@@ -1,5 +1,6 @@
 /** Aggregation of parsed turns into period totals and time series. */
 import { loadAll, type Turn } from "./parser.ts";
+import { selectTurns, type UsageOptions } from "./pricing.ts";
 import { bucketLabel, bucketStart, type Unit } from "./time.ts";
 import type { PeriodStats, TokenBurnReport } from "./types.ts";
 
@@ -13,6 +14,15 @@ const emptyStats = (): PeriodStats => ({
 	sessions: 0,
 });
 
+export const HOUR_MS = 3_600_000;
+
+/** Every file's turns with the filter and price table applied (files left empty are dropped). */
+export async function loadSelected(root: string, opts?: UsageOptions): Promise<Turn[][]> {
+	const all = await loadAll(root);
+	if (!opts) return all;
+	return all.map((t) => selectTurns(t, opts)).filter((t) => t.length > 0);
+}
+
 export const turnTokens = (t: Turn, includeCache: boolean) =>
 	t.input + t.output + (includeCache ? t.cacheRead + t.cacheWrite : 0);
 
@@ -20,13 +30,16 @@ export async function collectUsage(
 	sessionsRoot: string,
 	now: Date = new Date(),
 	includeCache = true,
+	opts?: UsageOptions,
 ): Promise<TokenBurnReport> {
+	const startOfHour = now.getTime() - HOUR_MS;
 	const startOfDay = bucketStart(now.getTime(), "day");
 	const startOfWeek = bucketStart(now.getTime(), "week");
 	const startOfMonth = bucketStart(now.getTime(), "month");
 	const startOfYear = bucketStart(now.getTime(), "year");
 
 	const report: TokenBurnReport = {
+		hour: emptyStats(),
 		today: emptyStats(),
 		week: emptyStats(),
 		month: emptyStats(),
@@ -43,7 +56,7 @@ export async function collectUsage(
 		p.cost += t.cost;
 	};
 
-	for (const turns of await loadAll(sessionsRoot)) {
+	for (const turns of await loadSelected(sessionsRoot, opts)) {
 		let maxTs = 0;
 		for (const t of turns) {
 			if (t.ts > maxTs) maxTs = t.ts;
@@ -52,12 +65,14 @@ export async function collectUsage(
 			if (t.ts >= startOfMonth) add(report.month, t);
 			if (t.ts >= startOfWeek) add(report.week, t);
 			if (t.ts >= startOfDay) add(report.today, t);
+			if (t.ts >= startOfHour) add(report.hour, t);
 		}
 		if (turns.length > 0) report.total.sessions++;
 		if (maxTs >= startOfYear) report.year.sessions++;
 		if (maxTs >= startOfMonth) report.month.sessions++;
 		if (maxTs >= startOfWeek) report.week.sessions++;
 		if (maxTs >= startOfDay) report.today.sessions++;
+		if (maxTs >= startOfHour) report.hour.sessions++;
 	}
 
 	return report;
@@ -79,6 +94,7 @@ export async function collectSeries(
 	count = DEFAULT_COUNT[unit],
 	now: Date = new Date(),
 	includeCache = true,
+	opts?: UsageOptions,
 ): Promise<SeriesPoint[]> {
 	const starts: number[] = [];
 	for (let i = count - 1; i >= 0; i--) {
@@ -98,7 +114,7 @@ export async function collectSeries(
 	const points = new Map<number, SeriesPoint>(
 		starts.map((start) => [start, { start, label: bucketLabel(start, unit), tokens: 0, cost: 0 }]),
 	);
-	for (const turns of await loadAll(sessionsRoot)) {
+	for (const turns of await loadSelected(sessionsRoot, opts)) {
 		for (const t of turns) {
 			const pt = points.get(bucketStart(t.ts, unit));
 			if (!pt) continue;
@@ -117,15 +133,16 @@ export async function collectAllSeries(
 	sessionsRoot: string,
 	now: Date = new Date(),
 	includeCache = true,
+	opts?: UsageOptions,
 ): Promise<{ unit: Unit; series: SeriesPoint[] }> {
 	let first = now.getTime();
-	for (const turns of await loadAll(sessionsRoot)) for (const t of turns) if (t.ts < first) first = t.ts;
+	for (const turns of await loadSelected(sessionsRoot, opts)) for (const t of turns) if (t.ts < first) first = t.ts;
 	const f = new Date(first);
 	const months = (now.getFullYear() - f.getFullYear()) * 12 + (now.getMonth() - f.getMonth()) + 1;
 	if (months <= 18) {
 		const unit: Unit = "month";
-		return { unit, series: await collectSeries(sessionsRoot, unit, Math.max(2, months), now, includeCache) };
+		return { unit, series: await collectSeries(sessionsRoot, unit, Math.max(2, months), now, includeCache, opts) };
 	}
 	const years = now.getFullYear() - f.getFullYear() + 1;
-	return { unit: "year", series: await collectSeries(sessionsRoot, "year", years, now, includeCache) };
+	return { unit: "year", series: await collectSeries(sessionsRoot, "year", years, now, includeCache, opts) };
 }
