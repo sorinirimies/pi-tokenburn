@@ -151,7 +151,7 @@ describe.skipIf(!posix)("synthetic fixture (examples/vhs/fixture.sh)", () => {
 		const first = (await totals(dir)).history;
 		expect(run().exitCode).toBe(0);
 		expect((await totals(dir)).history).toBe(first);
-	});
+	}, 30_000); // building the fixture twice takes ~8 s on a busy machine
 
 	it("`append` adds one fresh assistant turn", async () => {
 		const { dir } = sessions();
