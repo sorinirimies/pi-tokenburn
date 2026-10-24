@@ -32,9 +32,10 @@ import json, sys, random, datetime
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 inp, out = random.randint(2, 12), random.randint(300, 1800)
 cr, cw = random.randint(1_200, 9_000), random.randint(0, 1_200)
-cost = round(cr * 0.0000003 + out * 0.000015 + cw * 0.00000375 + inp * 0.000003, 4)
-line = {"timestamp": now, "message": {"role": "assistant", "usage": {
-    "input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": {"total": cost}}}}
+c_in, c_out, c_cr, c_cw = inp * 0.000003, out * 0.000015, cr * 0.0000003, cw * 0.00000375
+line = {"timestamp": now, "message": {"role": "assistant", "provider": "acme", "model": "acme-large", "usage": {
+    "input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw,
+    "cost": {"input": c_in, "output": c_out, "cacheRead": c_cr, "cacheWrite": c_cw, "total": round(c_in + c_out + c_cr + c_cw, 6)}}}}
 open(sys.argv[1], "a").write(json.dumps(line) + "\n")
 PY
     exit 0
@@ -50,6 +51,13 @@ rnd = random.Random(20261009)          # deterministic: same demo every time
 now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
 DAYS = 900                             # ~2.5 years: enough for the year and all-time charts
 PROJECTS = ["android-app", "api-gateway", "pi-extensions", "docs-site", "data-pipeline"]
+# Made-up providers and models with their own $/M-token prices (input, output, cacheRead, cacheWrite):
+# a big one most of the time, a cheap one for small jobs, and a second provider now and then.
+MODELS = [  # (weight, provider, model, prices)
+    (6, "acme", "acme-large", (3.0, 15.0, 0.3, 3.75)),
+    (3, "acme", "acme-small", (0.8, 4.0, 0.08, 1.0)),
+    (2, "nova", "nova-mini", (0.4, 1.6, 0.04, 0.5)),
+]
 
 def iso(t): return t.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 def day_weight(d):
@@ -73,14 +81,19 @@ for ago in range(DAYS - 1, -1, -1):
         if t > now:                    # never write the future
             t = now - dt.timedelta(minutes=rnd.randint(1, 240))
         lines.append((t, {"timestamp": iso(t), "message": {"role": "user", "content": "…"}}))
+        _, provider, model, (p_in, p_out, p_cr, p_cw) = rnd.choices(MODELS, weights=[m[0] for m in MODELS])[0]
         inp, out = rnd.randint(2, 14), rnd.randint(300, 1800)
         cr, cw = rnd.randint(1_200, 9_000), rnd.randint(0, 1_200)
-        cost = round(cr * 0.0000003 + out * 0.000015 + cw * 0.00000375 + inp * 0.000003, 4)
+        c = {"input": inp * p_in / 1e6, "output": out * p_out / 1e6, "cacheRead": cr * p_cr / 1e6, "cacheWrite": cw * p_cw / 1e6}
+        c["total"] = round(sum(c.values()), 6)
         lines.append((t + dt.timedelta(seconds=20), {"timestamp": iso(t + dt.timedelta(seconds=20)), "message": {
-            "role": "assistant", "usage": {"input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": {"total": cost}}}}))
+            "role": "assistant", "provider": provider, "model": model,
+            "usage": {"input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": c}}}))
     lines.sort(key=lambda x: x[0])
     name = f"{day.isoformat()}T08-30-00-000Z_{rnd.getrandbits(32):08x}.jsonl"
     with open(os.path.join(sess_dir, name), "w") as f:
+        # pi's session header: the project path is what `/tokenburn projects` groups by
+        f.write(json.dumps({"type": "session", "id": name, "timestamp": iso(start), "cwd": f"/home/demo/projects/{project}"}, separators=(",", ":")) + "\n")  # compact, like pi writes it
         for _, rec in lines:
             f.write(json.dumps(rec) + "\n")
 

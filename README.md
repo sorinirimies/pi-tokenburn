@@ -15,7 +15,10 @@ Totals match the `tokenburn` CLI exactly.
 
 ## Features
 
-- **Status bar:** `🔥 1.20M ($52.79) [today]`, turns red with `OVER BUDGET` past your limit.
+- **Status bar:** `🔥 1.2M ($5.10) [today] · 52k/h · 95% hit · ~$12.40 saved`: tokens, cost, burn rate, cache hit ratio and estimated cache savings for the chosen period (each extra toggleable). Turns red with `OVER BUDGET` past your limit.
+- **Tables:** usage per model, provider, project and session, for any period, with cache hit %, savings, cost and share.
+- **Filter and export:** limit everything to a provider, model or project; write csv or json.
+- **Pricing:** a price table fills in (or overrides) costs the logs don't have.
 - **Report chart:** `/tokenburn` shows the summary plus a vertical column chart (y-axis, budget line, current period marked, over-budget columns in red, peak/avg footer). Daily (14 days), weekly (8 weeks) or monthly (6 months).
 - **Status line:** `/tokenburn day|week|month|year|all` (or `cycle`) changes the period shown at the bottom. Charts live under `/tokenburn chart <view>`.
 - **Window panel (optional):** Today / Week / Month / Total below the editor, with in/out tokens and cost.
@@ -72,9 +75,9 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 
 Recorded from a real pi with only this plugin loaded, on synthetic data.
 
-**Switch what the bottom line shows** (`/tokenburn day|week|month|year|all`, or `cycle`):
+**Switch what the bottom line shows** (`/tokenburn hour|day|week|month|year|all`, or `cycle`):
 
-![Status line: week, month, year, all, day, then cycle](examples/vhs/generated/status.gif)
+![Status line: week, month, year, all, day, then cycle through every period](examples/vhs/generated/status.gif)
 
 **Charts** (`/tokenburn chart day|week|month|year|all`): the current period is green, with a peak and average footer:
 
@@ -91,6 +94,22 @@ Recorded from a real pi with only this plugin loaded, on synthetic data.
 **Enable / disable:** off means off (nothing runs in the background), and charts still work on demand:
 
 ![Disable clears the footer, a chart still works, enable brings it back](examples/vhs/generated/enable-disable.gif)
+
+**Tables** (`/tokenburn models week`, `providers month`, `projects`, `sessions week 5`): who spends what, with cache hit %, estimated savings and share:
+
+![Tables: models, providers, projects and sessions](examples/vhs/generated/tables.gif)
+
+**Filter and export** (`/tokenburn filter model acme-large`, `export csv week usage.csv`): the footer, tables and the file all follow the filter:
+
+![Filter to one model, see it in the table, export csv, clear the filter](examples/vhs/generated/filter-export.gif)
+
+**Footer extras** (`/tokenburn hour`, `rate`, `hit`, `saved`): the burn rate, cache hit ratio and cache savings follow the chosen period, and each can be switched off:
+
+![Footer: hour and week periods, rate, hit and saved toggled off and on](examples/vhs/generated/statusline.gif)
+
+**Pricing** (`/tokenburn pricing`, `price acme-large 3 15 0.3 3.75`): where costs come from, and a price table that can fill in or override them:
+
+![Pricing: cost sources, set a price, switch to override](examples/vhs/generated/pricing.gif)
 
 **Tab-completion** uses pi's own menu, with a description for every option:
 
@@ -156,7 +175,7 @@ Refreshing is designed to cost nothing you can notice:
 
 ## Demo recordings
 
-The GIFs above live in [`examples/vhs/generated/`](examples/vhs/generated) and are stored with **Git LFS** (`git lfs install` once). They are recorded with [VHS](https://github.com/charmbracelet/vhs) from a **real pi** that loads only this extension, on **synthetic** data (`examples/vhs/fixture.sh`: 900 days of made-up sessions in `/tmp` with deliberately small numbers, and a local mock model for the live-refresh demo), never from real logs, paths or credentials:
+The GIFs above live in [`examples/vhs/generated/`](examples/vhs/generated) and are stored with **Git LFS** (`git lfs install` once). They are recorded with [VHS](https://github.com/charmbracelet/vhs) from a **real pi** that loads only this extension, on **synthetic** data (`examples/vhs/fixture.sh`: 900 days of made-up sessions across fictional projects, providers and models in `/tmp`, with deliberately small numbers, and a local mock model for the live-refresh demo), never from real logs, paths or credentials:
 
 ```sh
 just vhs-all          # every tape (examples/vhs/*.tape): needs vhs, ttyd, ffmpeg, pi, bun, python3

@@ -1,6 +1,6 @@
 # VHS tape: status
 # /tokenburn day|week|month|year|all switches what the bottom status line shows (it prints
-# no chart). /tokenburn cycle rotates today > week > month > year > total.
+# no chart). /tokenburn cycle rotates today > week > month > year > total > hour.
 #
 # Runs a real pi with only the pi-tokenburn extension loaded, on the throw-away
 # data from fixture.sh (HOME and the pi agent dir redirected into /tmp), so it

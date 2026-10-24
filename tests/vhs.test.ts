@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
-import { collectAllSeries, collectUsage, parseCommand } from "../extensions/tokenburn.ts";
+import { collectAllSeries, collectGroups, collectUsage, parseCommand } from "../extensions/tokenburn.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const VHS = join(ROOT, "examples", "vhs");
@@ -14,7 +14,7 @@ const posix = process.platform !== "win32";
 
 describe("VHS tapes", () => {
 	it("there is a tape for every feature we show off", () => {
-		for (const name of ["overview", "status", "charts", "budget", "enable-disable", "completion", "live-refresh"]) {
+		for (const name of ["overview", "status", "charts", "budget", "enable-disable", "completion", "live-refresh", "tables", "filter-export", "statusline", "pricing"]) {
 			expect(tapes, name).toContain(`${name}.tape`);
 		}
 	});
@@ -133,6 +133,17 @@ describe.skipIf(!posix)("synthetic fixture (examples/vhs/fixture.sh)", () => {
 		const all = await collectAllSeries(dir);
 		expect(all.unit).toBe("year"); // so `chart all` is a yearly chart
 		expect(all.series.length).toBeGreaterThanOrEqual(3);
+	});
+
+	it("has fictional providers, models and projects for the tables, with cache savings", async () => {
+		const { dir } = sessions();
+		const keys = async (by: "provider" | "model" | "project") => (await collectGroups(dir, by, "all", new Date(), true)).map((r) => r.key).sort();
+		expect(await keys("provider")).toEqual(["acme", "nova"]);
+		expect(await keys("model")).toEqual(["acme/acme-large", "acme/acme-small", "nova/nova-mini"]);
+		const projects = await keys("project");
+		expect(projects.length).toBe(5);
+		expect(projects.every((p) => p.startsWith("/home/demo/projects/"))).toBe(true);
+		expect((await collectUsage(dir)).total.cacheBase).toBeGreaterThan(0);
 	});
 
 	it("is deterministic (history is identical on every build; only today's cut-off moves)", async () => {

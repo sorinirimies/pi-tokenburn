@@ -352,6 +352,9 @@ describe("tokenburn features", () => {
 		it("omits what is meaningless (no tokens, no prompt, no savings)", () => {
 			const empty = stat({ tokens: 0, input: 0, cacheRead: 0, cacheBase: 0, cacheActual: 0 });
 			expect(statusExtras(rep({ hour: empty }), cfg({ statusWindow: "hour" }), n)).toEqual([]);
+			// savings under half a cent would print "~$0.00 saved": hidden
+			const tiny = stat({ cacheBase: 0.004, cacheActual: 0.0004 });
+			expect(statusExtras(rep({ hour: tiny }), cfg({ statusWindow: "hour" }), n).some((e) => e.includes("saved"))).toBe(false);
 		});
 	});
 
@@ -465,7 +468,7 @@ describe("tokenburn features", () => {
 			sessionFile = join(agent, "sessions", "p", "cur.jsonl");
 			writeFileSync(
 				sessionFile,
-				[header("/w/cur"), line(new Date(), { cost: 4, input: 1000, output: 1000, cacheRead: 500, costInput: 0.001 })].join("\n") + "\n",
+				[header("/w/cur"), line(new Date(), { cost: 4, input: 1000, output: 1000, cacheRead: 500, costInput: 1 })].join("\n") + "\n",
 			);
 			clearCache();
 			handlers = {};
@@ -557,7 +560,7 @@ describe("tokenburn features", () => {
 		it("`hit` and `saved` toggle the cache hit ratio and savings in the status line; `hour` is a status window", async () => {
 			await run("hour");
 			expect(status).toContain("[hour]");
-			expect(status).toMatch(/\d+% hit/);
+						expect(status).toMatch(/\d+% hit/);
 			expect(status).toContain("saved");
 			expect(await run("hit")).toContain("off");
 			expect(status).not.toContain("% hit");

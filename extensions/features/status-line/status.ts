@@ -30,6 +30,6 @@ export function statusExtras(report: TokenBurnReport, cfg: TokenBurnConfig, now:
 	const out: string[] = [];
 	if (cfg.showRate && stat.tokens > 0) out.push(`${formatNum(windowRate(stat, cfg.statusWindow, report.firstTs, now).tokensPerHour)}/h`);
 	if (cfg.showHit && stat.input + stat.cacheRead + stat.cacheWrite > 0) out.push(`${Math.round(cacheHitRatio(stat) * 100)}% hit`);
-	if (cfg.showSaved && statSavings(stat) > 0) out.push(`~${formatCost(statSavings(stat))} saved`);
+	if (cfg.showSaved && statSavings(stat) >= 0.005) out.push(`~${formatCost(statSavings(stat))} saved`);
 	return out;
 }
