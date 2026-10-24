@@ -3,12 +3,51 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
-## [0.5.8](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.8) — 2026-10-15
+## [0.6.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.6.0) — 2026-10-24
 
+
+### ✨ Features
+
+- Model/provider/project/session tables, filters, burn rate + projection, budget warnings, current-session cost, export, cache efficiency, price table ([`83bdd3d`](https://github.com/sorinirimies/pi-tokenburn/commit/83bdd3ddffa5c6f57d87b46f537e938be4f38e37))
+- Status line shows burn rate, cache hit and savings for the status window (toggleable); add hour window; harden non-finite log numbers ([`6fd55c9`](https://github.com/sorinirimies/pi-tokenburn/commit/6fd55c92ab6f6646d4a971d8bb73655c7e24b17f))
+
+### 🐛 Fixes
+
+- 'filter all' completes without a trailing space; assert it ([`9f194d9`](https://github.com/sorinirimies/pi-tokenburn/commit/9f194d9b766c70a41be11a9c5a4777835c492b65))
+
+### ♻️ Refactor
+
+- Split extensions/tokenburn.ts into lib/ modules (types, config, format, parser, time, aggregate, chart, coalescer, command) ([`5d928aa`](https://github.com/sorinirimies/pi-tokenburn/commit/5d928aa5b1b6581ad4a694a58d0c9808c8557eb5))
+- Feature folders (core, command, features/*), per-feature command handlers, entry file is wiring only ([`3d4c783`](https://github.com/sorinirimies/pi-tokenburn/commit/3d4c783647d2bce9da33bab632f3108fbda23112))
+
+### 📚 Docs
+
+- New demos (tables, filter-export, statusline, pricing), richer fixture (providers, models, projects), hide sub-cent savings in the footer ([`679d80b`](https://github.com/sorinirimies/pi-tokenburn/commit/679d80bede7eb7042fc36a30a6cdea2dd6024cff))
+
+### 🧪 Tests
+
+- Seeded fuzz tests + nightly fuzz and bun-audit workflows; cap bar() width, tolerate invalid dates in charts ([`19339fb`](https://github.com/sorinirimies/pi-tokenburn/commit/19339fbf22dc950287813a73a9282bd3bdfdf76f))
+- Give the fixture determinism test a 30 s timeout ([`b56461a`](https://github.com/sorinirimies/pi-tokenburn/commit/b56461a3775dd94871f49c7796547340a10ff6fd))
 
 ### 🔧 Build & CI
 
-- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
+- Ignore commits already released via the other host's parallel nightly (no phantom patch release) ([`17bdbc8`](https://github.com/sorinirimies/pi-tokenburn/commit/17bdbc81e2b5ca51961108fa5b98b240d682bdd6))
+- **deps:** Bump taiki-e/install-action from 2.87.27 to 2.87.29 (#5) ([`f63aac2`](https://github.com/sorinirimies/pi-tokenburn/commit/f63aac2194a2765017c0010905b004ef393141e7))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-10-15 (not released) ([`1dbdab7`](https://github.com/sorinirimies/pi-tokenburn/commit/1dbdab7c43c4748f3c2e718c74a3c819c733a591))
+- Nightly dev-tooling lockfile update 2026-10-18 (not released) ([`9f340b0`](https://github.com/sorinirimies/pi-tokenburn/commit/9f340b066464ddca5160e8add69bde063f35d6e7))
+- Nightly dev-tooling lockfile update 2026-10-20 (not released) ([`fb05bfb`](https://github.com/sorinirimies/pi-tokenburn/commit/fb05bfb0a40e94afe2cffdd8e30f9adfb3dd5e50))
+- Nightly dev-tooling lockfile update 2026-10-21 (not released) ([`8a14a2e`](https://github.com/sorinirimies/pi-tokenburn/commit/8a14a2e7ddd4c5e4a16341f7390d3a662ea0392e))
+- Nightly dev-tooling lockfile update 2026-10-22 (not released) ([`d9441cc`](https://github.com/sorinirimies/pi-tokenburn/commit/d9441cc6ea384a0e1b4ac93f9d30ef0735691764))
+- Nightly dev-tooling lockfile update 2026-10-23 (not released) ([`4bb30b0`](https://github.com/sorinirimies/pi-tokenburn/commit/4bb30b0ee7bef356910ad9d5dec5fdc9463bbb6f))
+
+### Justfile
+
+- Skip unreachable remotes gracefully (5s SSH timeout, warn instead of fail) ([`e7ae588`](https://github.com/sorinirimies/pi-tokenburn/commit/e7ae5886e5a211b7175fe59ac5aa5de596910837))
+## [0.5.8](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.8) — 2026-10-15
+
 
 ### 🧹 Chores
 
@@ -19,15 +58,22 @@ Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 
 ### 📚 Docs
 
-- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
 - Separate install commands for individual copy ([`fb38f4a`](https://github.com/sorinirimies/pi-tokenburn/commit/fb38f4a671ee887b3812e83191071025239f628a))
 
 ### 🔧 Build & CI
 
-- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 - Don't release on ci(deps) (GitHub Actions) bumps ([`6159ef4`](https://github.com/sorinirimies/pi-tokenburn/commit/6159ef487b5af9166f98368c3e28779dec37c65b))
+- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
 ## [0.5.6](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.6) — 2026-10-13
 
+
+### 📚 Docs
+
+- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
+
+### 🔧 Build & CI
+
+- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 
 ### 🧹 Chores
 
