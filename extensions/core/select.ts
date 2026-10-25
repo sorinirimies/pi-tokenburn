@@ -103,3 +103,12 @@ export function selectTurns(turns: Turn[], opts: UsageOptions | undefined): Turn
 	}
 	return out;
 }
+
+/**
+ * What the turn's cached tokens would have cost as plain input (`base`) and what they did cost
+ * (`actual`). Both 0 when the log has no input price for the turn (then no savings are claimed).
+ */
+export function cacheValue(t: Turn): { base: number; actual: number } {
+	if (!(t.input > 0 && t.costInput > 0)) return { base: 0, actual: 0 };
+	return { base: (t.cacheRead * t.costInput) / t.input, actual: t.costCacheRead };
+}

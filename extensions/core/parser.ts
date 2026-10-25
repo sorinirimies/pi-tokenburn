@@ -64,13 +64,13 @@ const GUARD_BYTES = 64;
 const HEAD_BYTES = 256;
 export const CHUNK_BYTES = 1 << 20;
 
-/** A Turn from one JSONL line, or undefined when it carries no usage. */
 /** A finite number, else 0 (logs can hold 1e999, strings, junk). */
 const finite = (v: unknown): number => {
 	const n = Number(v);
 	return Number.isFinite(n) ? n : 0;
 };
 
+/** A Turn from one JSONL line, or undefined when it carries no usage. */
 function turnFromLine(line: Buffer, meta: Meta): Turn | undefined {
 	if (meta.cwd === undefined && line.includes('"type":"session"')) {
 		try {

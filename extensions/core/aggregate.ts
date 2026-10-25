@@ -1,6 +1,6 @@
 /** Aggregation of parsed turns into period totals and time series. */
 import { loadAll, type Turn } from "./parser.ts";
-import { selectTurns, type UsageOptions } from "./select.ts";
+import { cacheValue, selectTurns, type UsageOptions } from "./select.ts";
 import { bucketLabel, bucketStart, type Unit } from "./time.ts";
 import type { PeriodStats, TokenBurnReport } from "./types.ts";
 
@@ -56,10 +56,9 @@ export async function collectUsage(
 		p.cacheRead += t.cacheRead;
 		p.cacheWrite += t.cacheWrite;
 		p.cost += t.cost;
-		if (t.input > 0 && t.costInput > 0) {
-			p.cacheBase += (t.cacheRead * t.costInput) / t.input;
-			p.cacheActual += t.costCacheRead;
-		}
+		const cv = cacheValue(t);
+		p.cacheBase += cv.base;
+		p.cacheActual += cv.actual;
 	};
 
 	for (const turns of await loadSelected(sessionsRoot, opts)) {

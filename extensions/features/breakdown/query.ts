@@ -1,6 +1,6 @@
 /** Grouped usage queries: per model, provider, project and session, over a period. */
 import { HOUR_MS, loadSelected, turnTokens } from "../../core/aggregate.ts";
-import type { UsageOptions } from "../../core/select.ts";
+import { cacheValue, type UsageOptions } from "../../core/select.ts";
 import { bucketStart } from "../../core/time.ts";
 
 export const PERIODS = ["hour", "day", "week", "month", "year", "all"] as const;
@@ -106,10 +106,9 @@ export async function collectGroups(
 			r.turns++;
 			if (t.ts < r.first) r.first = t.ts;
 			if (t.ts > r.last) r.last = t.ts;
-			if (t.input > 0 && t.costInput > 0) {
-				r.cacheBase += (t.cacheRead * t.costInput) / t.input;
-				r.cacheActual += t.costCacheRead;
-			}
+			const cv = cacheValue(t);
+			r.cacheBase += cv.base;
+			r.cacheActual += cv.actual;
 			if (!seen.has(key)) {
 				seen.add(key);
 				r.sessions++;

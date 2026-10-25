@@ -1,7 +1,7 @@
 /** Config file (tokenburn.json), path resolution, budgets. */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { sanitizeFilter, sanitizePrices, type PriceMode, type PriceTable, type UsageFilter } from "./select.ts";
 import { STATUS_WINDOWS, type PeriodStats, type Window } from "./types.ts";
 
@@ -140,8 +140,12 @@ export function freshConfig(): TokenBurnConfig {
 }
 
 export async function saveConfig(cfg: TokenBurnConfig): Promise<void> {
-	await mkdir(getConfigDir(), { recursive: true });
-	await writeFile(join(getConfigDir(), "tokenburn.json"), JSON.stringify(cfg, null, 2) + "\n", "utf8");
+	const dir = getConfigDir();
+	await mkdir(dir, { recursive: true });
+	// Write beside, then rename: a crash or a second pi session never leaves half a file behind.
+	const tmp = join(dir, `tokenburn.json.${process.pid}.tmp`);
+	await writeFile(tmp, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+	await rename(tmp, join(dir, "tokenburn.json"));
 }
 
 export function budgetsFor(cfg: TokenBurnConfig, w: Window): { tokens?: number; cost?: number } {

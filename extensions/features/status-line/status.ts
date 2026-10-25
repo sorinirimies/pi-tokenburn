@@ -1,11 +1,10 @@
 /** Status line: window start, burn rate / cache hit / savings extras for the status window (pure). */
 import type { TokenBurnConfig } from "../../core/config.ts";
 import { formatCost, formatNum } from "../../core/format.ts";
+import { HOUR_MS as HOUR } from "../../core/aggregate.ts";
 import { bucketStart } from "../../core/time.ts";
 import type { PeriodStats, Rate, TokenBurnReport, Window } from "../../core/types.ts";
 import { cacheHitRatio } from "../breakdown/query.ts";
-
-const HOUR = 3_600_000;
 
 /** Start of a status window (`hour` = rolling last 60 minutes, `total` = 0). */
 export function windowStart(w: Window, now: number): number {
