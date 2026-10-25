@@ -68,21 +68,28 @@ export function renderChart(
 			if (h >= row) cell = "█";
 			else if (h > row - 1 && series[i].tokens > 0) cell = SPARK[Math.min(7, Math.max(0, Math.floor((h - (row - 1)) * 8) - 1))];
 			else if (row === 1 && series[i].tokens > 0) cell = "▁";
+			else if (row === 1 && budgetRow !== 1) cell = "·"; // an empty bucket, not a missing one
 			else cell = row === budgetRow ? "┄" : " ";
-			const filled = cell !== " " && cell !== "┄";
+			const filled = cell !== " " && cell !== "┄" && cell !== "·";
 			const body = cell.repeat(barW);
-			line += filled ? paint(kindOf(i), body) : cell === "┄" ? paint("budget", body) : body;
+			line += filled ? paint(kindOf(i), body) : cell === "┄" ? paint("budget", body) : cell === "·" ? paint("axis", body) : body;
 			line += row === budgetRow ? paint("budget", "┄") : " ";
 		}
 		lines.push(line);
 	}
 
-	lines.push(paint("axis", `${"".padStart(yW)} └${"─".repeat(series.length * colW)}`));
+	lines.push(paint("axis", `${yLabels[2].padStart(yW)} └${"─".repeat(series.length * colW)}`));
 	const pad = " ".repeat(yW + 2);
 	const cols = series.map((p, i) => ({ l: columnLabels(p, unit), now: i === series.length - 1 }));
 	lines.push(pad + cols.map((c) => c.l[0].padEnd(colW)).join(""));
 	lines.push(paint("dim", pad + cols.map((c) => c.l[1].padEnd(colW)).join("")));
-	lines.push(pad + cols.map((c) => (c.now ? paint("now", "▲".padEnd(colW)) : " ".repeat(colW))).join(""));
+	// The marker under the current bucket, with its value so you need not read it off the axis.
+	const latest = series[series.length - 1];
+	lines.push(
+		pad +
+			cols.map((c) => (c.now ? paint("now", "▲".padEnd(colW)) : " ".repeat(colW))).join("") +
+			(latest ? paint("now", `now ${formatNum(latest.tokens)} (${formatCost(latest.cost)})`) : ""),
+	);
 
 	const avg = series.length ? total / series.length : 0;
 	lines.push(

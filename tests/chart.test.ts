@@ -111,6 +111,19 @@ describe("collectSeries / renderChart", () => {
 		expect(bottom).toContain("██");
 	});
 
+	it("labels the zero line, dots empty buckets and prints the current value under the marker", async () => {
+		const now = new Date(2026, 9, 9, 12);
+		writeFileSync(join(dir, "p", "s.jsonl"), line(new Date(2026, 9, 8), 5000) + "\n" + line(new Date(2026, 9, 9), 100) + "\n");
+		const out = renderChart(await collectSeries(dir, "day", 3, now), "day", { height: 4 });
+		const axis = out.find((l) => l.includes("└"))!;
+		expect(axis.trimStart().startsWith("0 └")).toBe(true); // the zero label sits on the axis
+		expect(out[4]).toContain("│·· "); // 10-07 had no usage: dotted, not blank
+		expect(out.find((l) => l.includes("▲"))).toMatch(/▲\s+now 100 \(\$0\.\d\d\)/);
+		// with a budget on the bottom row the budget line wins over the dots
+		const tiny = renderChart(await collectSeries(dir, "day", 3, now), "day", { height: 4, budget: { tokens: 1 } });
+		expect(tiny[4]).toContain("┄");
+	});
+
 	it("draws a budget line and marks over-budget columns", async () => {
 		const now = new Date(2026, 9, 9, 12);
 		writeFileSync(join(dir, "p", "s.jsonl"), line(new Date(2026, 9, 8), 5000) + "\n" + line(new Date(2026, 9, 9), 100) + "\n");
