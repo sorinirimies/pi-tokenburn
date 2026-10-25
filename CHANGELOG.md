@@ -3,6 +3,27 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.7.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.0) — 2026-10-25
+
+
+### ✨ Features
+
+- **chart:** Zero label on the axis, dotted empty buckets, current value under the marker ([`75778c3`](https://github.com/sorinirimies/pi-tokenburn/commit/75778c34d82dfdf2ab181cf41f418f424ccd5d69))
+
+### ♻️ Refactor
+
+- One cacheValue helper for cache savings, shared hour constant, atomic config save, fix misplaced doc comment ([`be7e918`](https://github.com/sorinirimies/pi-tokenburn/commit/be7e91886d7deef0a4ae892f20f209be40783730))
+
+### 📚 Docs
+
+- Re-record charts and overview demos with the improved chart ([`6028ae9`](https://github.com/sorinirimies/pi-tokenburn/commit/6028ae9cfb69ea4d385c4587d1da2b7779e4f75a))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-10-20 (not released) ([`718d170`](https://github.com/sorinirimies/pi-tokenburn/commit/718d170434af72180834d4573f15fb09c5f800f3))
+- Nightly dev-tooling lockfile update 2026-10-21 (not released) ([`945f9ce`](https://github.com/sorinirimies/pi-tokenburn/commit/945f9ce202d430c2451a784dcf2ee9660958be53))
+- Nightly dev-tooling lockfile update 2026-10-22 (not released) ([`764c94b`](https://github.com/sorinirimies/pi-tokenburn/commit/764c94b537a85ead806b6696eb9f37680ec1ca1c))
+- Nightly dev-tooling lockfile update 2026-10-23 (not released) ([`d244826`](https://github.com/sorinirimies/pi-tokenburn/commit/d24482618012f7f41acdf0e507648083f944d5f2))
 ## [0.6.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.6.0) — 2026-10-24
 
 
