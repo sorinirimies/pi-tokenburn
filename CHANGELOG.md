@@ -3,6 +3,26 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.7.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.1) — 2026-10-31
+
+
+### 🔧 Build & CI
+
+- **deps:** Bump hustcer/setup-nu from 3.28 to 3.29 (#6) ([`62b3ce5`](https://github.com/sorinirimies/pi-tokenburn/commit/62b3ce51fd838aa778db5c920b5a84b2d39b8e65))
+- **deps:** Bump taiki-e/install-action from 2.87.29 to 2.87.31 (#7) ([`c062f59`](https://github.com/sorinirimies/pi-tokenburn/commit/c062f59bb5fd30cb58b3ba5c1611ab8351d962e9))
+- Give the nightly fuzz run a long per-test timeout (200k runs exceeded bun's 5 s default) ([`8e8efaa`](https://github.com/sorinirimies/pi-tokenburn/commit/8e8efaa52263292b6e5afeaaf8733cfe81fe35a8))
+- Keep .gitea workflow actions up to date; auto-merge needs GH_PAT for action bumps ([`3945616`](https://github.com/sorinirimies/pi-tokenburn/commit/3945616774fa6762ad52955da3e6a2c013707291))
+- **deps:** Bump Gitea workflow actions ([`da7a668`](https://github.com/sorinirimies/pi-tokenburn/commit/da7a668d18f67045057c5fb9bc3ff1eb1e1ce218))
+- One nightly (GitHub); Gitea mirrors GitHub's main and tags hourly ([`55b42ad`](https://github.com/sorinirimies/pi-tokenburn/commit/55b42adc46f62f678d7945354201cfa7406a3a4a))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-10-27 (not released) ([`508ea17`](https://github.com/sorinirimies/pi-tokenburn/commit/508ea17bb4d33951552dbf41d19f7f233d38092e))
+- Nightly dev-tooling lockfile update 2026-10-29 (not released) ([`111bf78`](https://github.com/sorinirimies/pi-tokenburn/commit/111bf787b367b860b08c1ec2ea8889f095de7a71))
+- Nightly dev-tooling lockfile update 2026-10-30 (not released) ([`57fb116`](https://github.com/sorinirimies/pi-tokenburn/commit/57fb1162c088019585f24edc090c854d5f0b8ba1))
+- Nightly dev-tooling lockfile update 2026-10-31 (not released) ([`4195858`](https://github.com/sorinirimies/pi-tokenburn/commit/4195858adb6fe5e7f84c056a1f984b8f893b6e09))
+- Nightly dev-tooling lockfile update 2026-10-31 (not released) ([`a0de1d8`](https://github.com/sorinirimies/pi-tokenburn/commit/a0de1d80ad821752e9d16eba2d84be1b2c6da0e7))
+- Merge Gitea's main (both hosts ran their own nightly) ([`a263e7a`](https://github.com/sorinirimies/pi-tokenburn/commit/a263e7a22cbfc38c2e636934c6844f37618bf1a7))
 ## [0.7.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.0) — 2026-10-25
 
 
