@@ -4,6 +4,8 @@
 [![npm downloads](https://img.shields.io/npm/dm/pi-tokenburn.svg)](https://www.npmjs.com/package/pi-tokenburn)
 [![CI](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/ci.yml/badge.svg)](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Audit](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/security.yml/badge.svg)](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/security.yml)
+[![Fuzz](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/fuzz.yml/badge.svg)](https://github.com/sorinirimies/pi-tokenburn/actions/workflows/fuzz.yml)
 
 Token usage and cost monitor with budgets, directly in your [Pi](https://github.com/earendil-works/pi-coding-agent) session.
 
