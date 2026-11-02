@@ -172,8 +172,8 @@ Weeks start on Monday, in local time.
 - `statusWindow` (default `today`): the status-line period, one of `hour`, `today`, `week`, `month`, `year`, `total`.
 - `showRate` / `showHit` / `showSaved` (default `true`): the burn rate, cache hit ratio and estimated savings in the status line.
 - `warnPct` (default `80`): notify once at this budget percentage and once when exceeded; `0` turns it off.
-- `filter`: only count usage whose `provider`, `model` or `project` contains the value (case-insensitive); same as `/tokenburn filter`.
-- `prices` / `priceMode` (default `fill`): price table in $ per million tokens, used where the log has no cost (`fill`) or always (`override`); same as `/tokenburn price`.
+- `filter`: only count usage whose `provider`, `model` or `project` contains the value (case-insensitive); set by the `filter` command.
+- `prices` / `priceMode` (default `fill`): price table in $ per million tokens, used where the log has no cost (`fill`) or always (`override`); set by the `price` command.
 - `budgets`: `dayTokens`, `weekTokens`, `monthTokens`, `dayCost`, `weekCost`, `monthCost`.
 
 Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CODING_AGENT_SESSION_DIR`, `PI_CODING_AGENT_DIR`.
