@@ -3,6 +3,28 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.7.2](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.2) — 2026-11-02
+
+
+### 🐛 Fixes
+
+- **ci:** A 409 from the other host publishing the same version first is not a failure ([`763ddad`](https://github.com/sorinirimies/pi-tokenburn/commit/763ddad161ee39300caef9d29701318170e19f87))
+
+### 📚 Docs
+
+- **readme:** Add the Audit and Fuzz badges ([`4cd20bd`](https://github.com/sorinirimies/pi-tokenburn/commit/4cd20bd08dab10e6e7b4193e37a508c4414468ff))
+
+### 🔧 Build & CI
+
+- Fuzz and Security workflows on GitHub and Gitea ([`2def598`](https://github.com/sorinirimies/pi-tokenburn/commit/2def5988adf38ec80193742c0893eb08e8a42ad4))
+- **deps-dev:** Pin minimatch 11.0.3 via overrides ([`bd1804c`](https://github.com/sorinirimies/pi-tokenburn/commit/bd1804c92942b9a971f5f835aa76575609f2f30a))
+- Cut a release from the Release workflow (bump, changelog, tag, push, publish) ([`4819f52`](https://github.com/sorinirimies/pi-tokenburn/commit/4819f52c2a162fd6a47bc0e0106b9d7ab11e2e90))
+- **deps:** Bump taiki-e/install-action from 2.87.31 to 2.88.1 (#8) ([`bb44e7a`](https://github.com/sorinirimies/pi-tokenburn/commit/bb44e7a70196b0350514eae92aaa42445809a3eb))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-11-01 (not released) ([`f885631`](https://github.com/sorinirimies/pi-tokenburn/commit/f88563125793f732a9f572d9b092d993ae9db78a))
+- Ignore .codegraph index ([`dfd620f`](https://github.com/sorinirimies/pi-tokenburn/commit/dfd620f26c3900d896c4af1589636c3c6de2f584))
 ## [0.7.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.1) — 2026-10-31
 
 
@@ -90,6 +112,10 @@ Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 ## [0.5.8](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.8) — 2026-10-15
 
 
+### 🔧 Build & CI
+
+- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
+
 ### 🧹 Chores
 
 - **justfile:** Push/pull current branch instead of hardcoded main ([`8a82d42`](https://github.com/sorinirimies/pi-tokenburn/commit/8a82d421c8b515c129cc808b1ea1cccd75856420))
@@ -99,22 +125,15 @@ Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 
 ### 📚 Docs
 
+- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
 - Separate install commands for individual copy ([`fb38f4a`](https://github.com/sorinirimies/pi-tokenburn/commit/fb38f4a671ee887b3812e83191071025239f628a))
 
 ### 🔧 Build & CI
 
+- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 - Don't release on ci(deps) (GitHub Actions) bumps ([`6159ef4`](https://github.com/sorinirimies/pi-tokenburn/commit/6159ef487b5af9166f98368c3e28779dec37c65b))
-- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
 ## [0.5.6](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.6) — 2026-10-13
 
-
-### 📚 Docs
-
-- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
-
-### 🔧 Build & CI
-
-- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 
 ### 🧹 Chores
 
