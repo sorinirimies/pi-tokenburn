@@ -3,6 +3,22 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.8.0](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.0) — 2026-11-02
+
+
+### ✨ Features
+
+- Count pi-context-diet's savings in the status line and the report ([`786e4b0`](https://github.com/sorinirimies/pi-tokenburn/commit/786e4b0b47602ea1cf362e2c1fad9a67e85f4826))
+- Count pi-squeeze's savings too, labelled for pi ([`228c46e`](https://github.com/sorinirimies/pi-tokenburn/commit/228c46ed35bf839a7c08d89063ee46e426ca668f))
+
+### 🧪 Tests
+
+- **vhs:** Read the UTC fixture in UTC and keep today's turns on today ([`b648e6e`](https://github.com/sorinirimies/pi-tokenburn/commit/b648e6ea7f58340d7acc1d8754a25fe289715477))
+- **live:** Poll for the refreshed status instead of trusting fixed sleeps ([`43e5c26`](https://github.com/sorinirimies/pi-tokenburn/commit/43e5c26e6774f910bb0b8bfbfe30f7129716b703))
+
+### 🔧 Build & CI
+
+- **deps:** Bump Gitea workflow actions ([`a4ce11d`](https://github.com/sorinirimies/pi-tokenburn/commit/a4ce11d21a7bf6c82bde95f23fc44d2ef0713572))
 ## [0.7.4](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.4) — 2026-11-02
 
 
