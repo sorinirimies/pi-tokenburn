@@ -21,9 +21,9 @@ Totals match the `tokenburn` CLI exactly.
 - **Tables:** usage per model, provider, project and session, for any period, with cache hit %, savings, cost and share.
 - **Filter and export:** limit everything to a provider, model or project; write csv or json.
 - **Pricing:** a price table fills in (or overrides) costs the logs don't have.
-- **Report chart:** `/tokenburn` shows the summary plus a vertical column chart (y-axis, budget line, current period marked, over-budget columns in red, peak/avg footer). Daily (14 days), weekly (8 weeks) or monthly (6 months).
-- **Status line:** `/tokenburn day|week|month|year|all` (or `cycle`) changes the period shown at the bottom. Charts live under `/tokenburn chart <view>`.
-- **Window panel (optional):** Today / Week / Month / Total below the editor, with in/out tokens and cost.
+- **Report chart:** `/tokenburn` shows the summary plus a vertical column chart (y-axis, budget line, current period marked, over-budget columns in red, peak/avg footer). Daily (14 days), weekly (8 weeks), monthly (6 months), yearly (5 years) or all-time.
+- **Status line:** `/tokenburn hour|day|week|month|year|all` (or `cycle`) changes the period shown at the bottom. Charts live under `/tokenburn chart <view>`.
+- **Window panel (optional):** Today / Week / Month / Year / Total below the editor, with in/out tokens and cost.
 - **Budgets** per day, week and month, in tokens and/or dollars.
 - **Live:** the bottom line updates after every assistant message, not only when a turn ends, at no measurable cost (see Performance).
 - **Fast:** per-file cache keyed on mtime+size. First scan of ~400 MB of sessions takes under a second; refreshes after that take milliseconds. Refresh never blocks the agent loop.
@@ -153,15 +153,28 @@ Weeks start on Monday, in local time.
   "showStatus": true,
   "showWidget": false,
   "statusWindow": "today",
+  "showRate": true,
+  "showHit": true,
+  "showSaved": true,
+  "warnPct": 80,
+  "filter": { "model": "acme-large" },
+  "prices": { "acme-large": { "input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 3.75 } },
+  "priceMode": "fill",
   "budgets": { "dayTokens": 5000000, "weekCost": 50 }
 }
 ```
 
-- `includeCache` (default `true`): count cache read/write tokens in totals, like the `tokenburn` CLI. Cache reads dominate (often 95%+ of tokens) but are billed far cheaper; set `false` to budget on input + output only.
-
 - `enabled` (default `true`): master switch, same as `/tokenburn enable|disable`.
 - `liveRefresh` (default `true`): refresh after each assistant message. `false` = only when a turn ends. `refreshMs` (default `750`, range 250 to 60000) is the coalescing delay.
+- `includeCache` (default `true`): count cache read/write tokens in totals, like the `tokenburn` CLI. Cache reads dominate (often 95%+ of tokens) but are billed far cheaper; set `false` to budget on input + output only.
 - `chartColor` (default `true`): color the chart using your pi theme (current period green, over-budget red, budget line yellow). Set `false` for plain text.
+- `showStatus` / `showWidget` (defaults `true` / `false`): the bottom status line and the panel below the editor.
+- `statusWindow` (default `today`): the status-line period, one of `hour`, `today`, `week`, `month`, `year`, `total`.
+- `showRate` / `showHit` / `showSaved` (default `true`): the burn rate, cache hit ratio and estimated savings in the status line.
+- `warnPct` (default `80`): notify once at this budget percentage and once when exceeded; `0` turns it off.
+- `filter`: only count usage whose `provider`, `model` or `project` contains the value (case-insensitive); same as `/tokenburn filter`.
+- `prices` / `priceMode` (default `fill`): price table in $ per million tokens, used where the log has no cost (`fill`) or always (`override`); same as `/tokenburn price`.
+- `budgets`: `dayTokens`, `weekTokens`, `monthTokens`, `dayCost`, `weekCost`, `monthCost`.
 
 Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CODING_AGENT_SESSION_DIR`, `PI_CODING_AGENT_DIR`.
 
@@ -198,7 +211,8 @@ bun install
 just check          # typecheck + tests + pack check + nushell tests (what CI runs)
 just test           # bun test only (with coverage)
 just coverage       # tests + a coverage table
-just push-all       # push main to every configured remote (origin + the Gitea instances); `just --list` has pull-all, push-tags-all, release-all, the *-force and sync-gitea-* variants
+just push-all       # push main to every configured remote (origin + the Gitea instances)
+just --list         # everything else: pull-all, push-tags-all, release-all, sync-gitea-*, the *-force variants
 ```
 
 **Coverage:** every `bun test` collects coverage (`bunfig.toml`) and **fails below 95% lines / 95% functions**. CI shows the table on the run page and uploads `lcov.info`.
@@ -233,7 +247,7 @@ CI scripts are [nushell](https://www.nushell.sh) (`scripts/`), the same ones loc
 | Workflow | When | What |
 |---|---|---|
 | **CI** | push / PR | quality gate on Linux; tests on macOS and Windows, and in extreme time zones |
-| **Fuzz** | nightly (GitHub 04:00 UTC, Gitea 04:30), and when the extension changes | seeded randomised robustness tests (`tests/fuzz.test.ts`), 200 000 runs per property; a failure prints the seed that reproduces it |
+| **Fuzz** | nightly (GitHub 04:00 UTC, Gitea 04:30), and when the extension changes | seeded randomised robustness tests (`tests/fuzz.test.ts`), 200 000 runs per property nightly (5 000 when the extension changes; `just fuzz [iterations] [seed]` locally); a failure prints the seed that reproduces it |
 | **Security** | nightly (GitHub 03:00 UTC, Gitea 03:30), and when dependencies change | `bun audit`: fails on any known vulnerability |
 | **Auto-merge library updates** | CI finished on a Dependabot PR | **patch and minor** updates (GitHub Actions) are merged automatically, but only **after CI is green** on that exact commit; a **major** update waits for you. Needs the `GH_PAT` secret: action bumps change `.github/workflows/*`, which `GITHUB_TOKEN` may not merge |
 | **Gitea Actions Update** | Mondays 03:15 UTC | Gitea has no Dependabot: moves the sha pins in `.gitea/workflows` to the newest release of the **same major** and commits `ci(deps)`; a new major is only reported |
