@@ -40,7 +40,7 @@ describe("the parse cache saved between pi runs", () => {
 		await loadAll(root);
 		const entries = exportCache();
 		const saved = encodeCache(entries);
-		expect(saved.strings).toEqual(["anthropic", "claude", "/work/a", "b"]);
+		expect([...saved.strings].sort()).toEqual(["/work/a", "anthropic", "b", "claude"]); // order follows the directory listing
 		expect(decodeCache(JSON.parse(JSON.stringify(saved)))).toEqual(entries);
 	});
 
