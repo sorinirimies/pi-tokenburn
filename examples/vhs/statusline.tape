@@ -1,6 +1,6 @@
 # VHS tape: statusline
 # What the footer shows: the status period (hour, today, week, ...), the burn rate, the cache hit
-# ratio and the estimated cache savings. Rate, hit and saved are each toggleable.
+# ratio and the estimated savings. Rate, hit and saved are each toggleable.
 #
 # Runs a real pi with only the pi-tokenburn extension loaded, on the throw-away
 # data from fixture.sh (HOME and the pi agent dir redirected into /tmp), so it

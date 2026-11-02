@@ -23,7 +23,7 @@ export interface TokenBurnConfig {
 	showRate: boolean;
 	/** Show the cache hit ratio of the status window in the status line. */
 	showHit: boolean;
-	/** Show the estimated cache savings of the status window in the status line. */
+	/** Show the estimated savings (prompt cache + pi-context-diet) of the status window in the status line. */
 	showSaved: boolean;
 	/** Notify once when a budget reaches this percentage (1 to 100); 0 turns warnings off. */
 	warnPct: number;

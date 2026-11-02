@@ -73,6 +73,6 @@ export const statusLineCommands: HandlersFor<"window" | "status" | "cycle" | "ca
 	async saved(_cmd, { config, persist, note }) {
 		config.showSaved = !config.showSaved;
 		await persist();
-		note(`tokenburn estimated cache savings in the status line: ${onOff(config.showSaved)}`);
+		note(`tokenburn estimated savings (cache + context-diet) in the status line: ${onOff(config.showSaved)}`);
 	},
 };

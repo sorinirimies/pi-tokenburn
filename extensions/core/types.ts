@@ -20,6 +20,12 @@ export interface PeriodStats {
 	/** What cache reads would have cost as plain input vs what they cost (turns with a known input price). */
 	cacheBase: number;
 	cacheActual: number;
+	/** Cache-read tokens of the turns with a known input price (`cacheActual` / this = the cache-read price). */
+	cacheReadPriced: number;
+	/** pi-context-diet: tokens kept out of requests, the requests, and what they would have cost as cache reads. */
+	dietTokens: number;
+	dietRequests: number;
+	dietUsd: number;
 }
 
 export interface TokenBurnReport {

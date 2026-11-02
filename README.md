@@ -17,7 +17,7 @@ Totals match the `tokenburn` CLI exactly.
 
 ## Features
 
-- **Status bar:** `🔥 1.2M ($5.10) [today] · 52k/h · 95% hit · ~$12.40 saved`: tokens, cost, burn rate, cache hit ratio and estimated cache savings for the chosen period (each extra toggleable). Turns red with `OVER BUDGET` past your limit.
+- **Status bar:** `🔥 1.2M ($5.10) [today] · 52k/h · 95% hit · ~$12.40 saved`: tokens, cost, burn rate, cache hit ratio and estimated savings (prompt cache, plus [pi-context-diet](https://github.com/sorinirimies/pi-context-diet) when installed) for the chosen period (each extra toggleable). Turns red with `OVER BUDGET` past your limit.
 - **Tables:** usage per model, provider, project and session, for any period, with cache hit %, savings, cost and share.
 - **Filter and export:** limit everything to a provider, model or project; write csv or json.
 - **Pricing:** a price table fills in (or overrides) costs the logs don't have.
@@ -61,7 +61,7 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 | `/tokenburn warn <pct>` | Notify once when a budget reaches `pct` percent (default 80) and once when it is exceeded |
 | `/tokenburn rate` | Toggle the burn rate in the status line (`42k/h`: tokens per hour averaged over the status period) |
 | `/tokenburn hit` | Toggle the cache hit ratio (`95% hit`) in the status line |
-| `/tokenburn saved` | Toggle the estimated cache savings (`~$12.40 saved`) in the status line |
+| `/tokenburn saved` | Toggle the estimated savings (`~$12.40 saved`: prompt cache + pi-context-diet) in the status line |
 | `/tokenburn pricing` | Where costs come from (session logs vs your price table) and which models are unpriced |
 | `/tokenburn price <model> <in> <out>` | Set a price in $ per million tokens (key `model` or `provider/model`); `price remove <model>` deletes it. `pricing mode <fill\|override>`: use the table only where the log has no cost (default), or always |
 | `/tokenburn window` | Toggle the panel below the editor |

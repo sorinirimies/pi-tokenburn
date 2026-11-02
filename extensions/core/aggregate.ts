@@ -1,6 +1,7 @@
 /** Aggregation of parsed turns into period totals and time series. */
+import { loadDietLog } from "./diet.ts";
 import { loadAll, type Turn } from "./parser.ts";
-import { cacheValue, selectTurns, type UsageOptions } from "./select.ts";
+import { cacheValue, hasFilter, selectTurns, type UsageOptions } from "./select.ts";
 import { bucketLabel, bucketStart, type Unit } from "./time.ts";
 import type { PeriodStats, TokenBurnReport } from "./types.ts";
 
@@ -14,6 +15,10 @@ const emptyStats = (): PeriodStats => ({
 	sessions: 0,
 	cacheBase: 0,
 	cacheActual: 0,
+	cacheReadPriced: 0,
+	dietTokens: 0,
+	dietRequests: 0,
+	dietUsd: 0,
 });
 
 export const HOUR_MS = 3_600_000;
@@ -33,6 +38,8 @@ export async function collectUsage(
 	now: Date = new Date(),
 	includeCache = true,
 	opts?: UsageOptions,
+	/** pi-context-diet's savings log (default: in pi's agent dir). */
+	dietLog?: string,
 ): Promise<TokenBurnReport> {
 	const startOfHour = now.getTime() - HOUR_MS;
 	const startOfDay = bucketStart(now.getTime(), "day");
@@ -59,6 +66,7 @@ export async function collectUsage(
 		const cv = cacheValue(t);
 		p.cacheBase += cv.base;
 		p.cacheActual += cv.actual;
+		if (cv.base > 0) p.cacheReadPriced += t.cacheRead;
 	};
 
 	for (const turns of await loadSelected(sessionsRoot, opts)) {
@@ -79,6 +87,27 @@ export async function collectUsage(
 		if (maxTs >= startOfWeek) report.week.sessions++;
 		if (maxTs >= startOfDay) report.today.sessions++;
 		if (maxTs >= startOfHour) report.hour.sessions++;
+	}
+
+	// pi-context-diet's log is not attributed to providers, models or projects: only unfiltered views count it.
+	if (!hasFilter(opts?.filter)) {
+		const windows: [PeriodStats, number][] = [
+			[report.total, -Infinity],
+			[report.year, startOfYear],
+			[report.month, startOfMonth],
+			[report.week, startOfWeek],
+			[report.today, startOfDay],
+			[report.hour, startOfHour],
+		];
+		for (const r of await loadDietLog(dietLog)) {
+			for (const [p, start] of windows) {
+				if (r.ts < start) continue;
+				p.dietTokens += r.tokens;
+				p.dietRequests++;
+			}
+		}
+		// Elided tokens would mostly have been cache reads: price them at the window's own cache-read price.
+		for (const [p] of windows) p.dietUsd = p.cacheReadPriced > 0 ? (p.dietTokens * p.cacheActual) / p.cacheReadPriced : 0;
 	}
 
 	return report;

@@ -27,6 +27,9 @@ export function renderReport(input: {
 		...(models.cacheRead + models.cacheWrite > 0
 			? [`cache: ${Math.round(cacheHitRatio(models) * 100)}% of prompt tokens read from cache${cacheSavings(models) > 0 ? ` · saved ~${formatCost(cacheSavings(models))}` : ""}`]
 			: []),
+		...(report.total.dietTokens > 0
+			? [`context-diet: ~${formatNum(report.total.dietTokens)} tokens kept out of ${report.total.dietRequests} requests${report.total.dietUsd > 0 ? ` · saved ~${formatCost(report.total.dietUsd)}` : ""}`]
+			: []),
 		...forecastLines(report, config, now),
 	];
 	return [
