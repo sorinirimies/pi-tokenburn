@@ -3,6 +3,12 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.7.4](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.4) — 2026-11-02
+
+
+### 🐛 Fixes
+
+- **deps:** Drop the pi-coding-agent peer dependency; it is a type-only import ([`15aa0c5`](https://github.com/sorinirimies/pi-tokenburn/commit/15aa0c5acdd1cece5f6c6f557a2e5e552a4c3055))
 ## [0.7.3](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.7.3) — 2026-11-02
 
 
@@ -114,10 +120,6 @@ Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 ## [0.5.8](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.8) — 2026-10-15
 
 
-### 🔧 Build & CI
-
-- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
-
 ### 🧹 Chores
 
 - **justfile:** Push/pull current branch instead of hardcoded main ([`8a82d42`](https://github.com/sorinirimies/pi-tokenburn/commit/8a82d421c8b515c129cc808b1ea1cccd75856420))
@@ -127,15 +129,22 @@ Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 
 ### 📚 Docs
 
-- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
 - Separate install commands for individual copy ([`fb38f4a`](https://github.com/sorinirimies/pi-tokenburn/commit/fb38f4a671ee887b3812e83191071025239f628a))
 
 ### 🔧 Build & CI
 
-- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 - Don't release on ci(deps) (GitHub Actions) bumps ([`6159ef4`](https://github.com/sorinirimies/pi-tokenburn/commit/6159ef487b5af9166f98368c3e28779dec37c65b))
+- Publish only when a runtime dependency really upgrades (or feat/fix/perf); dev-tooling updates no longer release ([`95e5110`](https://github.com/sorinirimies/pi-tokenburn/commit/95e5110685335acb4fd7539aaaf84dd473b57a45))
 ## [0.5.6](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.5.6) — 2026-10-13
 
+
+### 📚 Docs
+
+- Separate install commands for individual copy ([`4286dda`](https://github.com/sorinirimies/pi-tokenburn/commit/4286dda7a77656082fea9c98bd411709217bf522))
+
+### 🔧 Build & CI
+
+- Don't release on ci(deps) (GitHub Actions) bumps ([`75046bc`](https://github.com/sorinirimies/pi-tokenburn/commit/75046bc553ea69bf8eb5e993f3c3bf788acd49ad))
 
 ### 🧹 Chores
 
