@@ -21,9 +21,6 @@
     "fuzz": "FUZZ_ITERS=20000 bun test tests/fuzz.test.ts --config=bunfig.fuzz.toml",
     "check": "nu scripts/ci/quality_gate.nu"
   },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  },
   "overrides": {
     "undici": "8.12.3",
     "minimatch": "11.0.3"
