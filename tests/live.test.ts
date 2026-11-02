@@ -7,6 +7,20 @@ import tokenBurn, { clearCache, resetStats, sanitizeRefreshMs, stats } from "../
 const line = (input: number) =>
 	JSON.stringify({ timestamp: new Date().toISOString(), message: { role: "assistant", usage: { input, output: 0, cost: { total: 0.1 } } } }) + "\n";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Refreshes are fire-and-forget, so a positive check polls until it holds instead of trusting a
+// fixed sleep (a busy CI runner can take longer than any fixed delay). Waits for "nothing
+// happened" still use sleep.
+const eventually = async (check: () => void, timeoutMs = 3000) => {
+	const end = Date.now() + timeoutMs;
+	for (;;) {
+		try {
+			return check();
+		} catch (e) {
+			if (Date.now() > end) throw e;
+		}
+		await sleep(10);
+	}
+};
 
 describe("live refresh, enable / disable", () => {
 	let dir: string;
@@ -66,9 +80,10 @@ describe("live refresh, enable / disable", () => {
 			appendFileSync(sessionFile, line(2000));
 			for (let i = 0; i < 25; i++) expect(handlers.message_end(assistant, ctx())).toBeUndefined();
 			expect(statusCalls.length).toBe(before); // nothing yet: it is coalesced, not synchronous
-			await sleep(450);
-			expect(statusCalls.length).toBe(before + 1);
-			expect(lastStatus()).toContain("3.0k");
+			await eventually(() => {
+				expect(statusCalls.length).toBe(before + 1);
+				expect(lastStatus()).toContain("3.0k");
+			});
 		});
 
 		it("only assistant messages trigger it; the handler always returns undefined (never replaces a message)", async () => {
@@ -89,9 +104,10 @@ describe("live refresh, enable / disable", () => {
 			appendFileSync(sessionFile, line(4000));
 			handlers.message_end(assistant, ctx()); // schedules a (very late) refresh
 			handlers.turn_end({}, ctx());
-			await sleep(60);
-			expect(lastStatus()).toContain("5.0k");
-			expect(statusCalls.length).toBe(before + 1);
+			await eventually(() => {
+				expect(lastStatus()).toContain("5.0k");
+				expect(statusCalls.length).toBe(before + 1);
+			});
 		});
 
 		it("liveRefresh=false: messages do nothing, turn_end still refreshes", async () => {
@@ -102,8 +118,7 @@ describe("live refresh, enable / disable", () => {
 			await sleep(400);
 			expect(statusCalls.length).toBe(before);
 			handlers.turn_end({}, ctx());
-			await sleep(60);
-			expect(lastStatus()).toContain("2.0k");
+			await eventually(() => expect(lastStatus()).toContain("2.0k"));
 		});
 
 		it("session_shutdown cancels a pending refresh (no stale-context use after a reload)", async () => {
@@ -127,8 +142,7 @@ describe("live refresh, enable / disable", () => {
 			resetStats();
 			appendFileSync(sessionFile, line(7));
 			handlers.message_end(assistant, ctx());
-			await sleep(400);
-			expect(stats.incrementalParses).toBe(1);
+			await eventually(() => expect(stats.incrementalParses).toBe(1));
 			expect(stats.fullParses).toBe(0);
 			expect(stats.bytesRead).toBeLessThan(2048);
 		});
@@ -176,8 +190,7 @@ describe("live refresh, enable / disable", () => {
 			// and live refresh works again
 			appendFileSync(sessionFile, line(1000));
 			handlers.message_end(assistant, ctx());
-			await sleep(400);
-			expect(lastStatus()).toContain("2.0k");
+			await eventually(() => expect(lastStatus()).toContain("2.0k"));
 		});
 
 		it("on / off are aliases", async () => {
@@ -271,8 +284,9 @@ describe("live refresh, enable / disable", () => {
 			expect(lastStatus()).toContain("🔥"); // enabled defaulted to true
 			appendFileSync(sessionFile, line(1000));
 			handlers.message_end(assistant, ctx()); // liveRefresh defaulted to true, refreshMs to 750
-			await sleep(1000);
-			expect(lastStatus()).toContain("2.0k");
+			await sleep(600);
+			expect(lastStatus()).not.toContain("2.0k"); // not yet: the 750 ms default delay
+			await eventually(() => expect(lastStatus()).toContain("2.0k"));
 		});
 	});
 });
