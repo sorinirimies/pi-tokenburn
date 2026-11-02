@@ -112,8 +112,16 @@ describe.skipIf(!posix)("synthetic fixture (examples/vhs/fixture.sh)", () => {
 		return { r, history: r.total.tokens - r.today.tokens };
 	};
 
+	// The fixture's days are UTC days (`env` exports TZ=UTC for the demos), so read it in UTC too:
+	// in the CI's Auckland / Pago Pago jobs local "today" is a different date for part of the day.
+	// Bun applies a runtime TZ change but not its deletion, so restore by assignment.
+	const tz = process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 	beforeAll(() => {
+		process.env.TZ = "UTC";
 		expect(run().exitCode).toBe(0);
+	});
+	afterAll(() => {
+		process.env.TZ = tz;
 	});
 
 	it("`env` points pi at the throw-away dirs, offline and in UTC", () => {

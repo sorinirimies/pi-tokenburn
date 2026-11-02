@@ -78,15 +78,17 @@ for ago in range(DAYS - 1, -1, -1):
     lines = []
     for i in range(turns):
         t = start + dt.timedelta(minutes=rnd.randint(0, 600))
-        if t > now:                    # never write the future
-            t = now - dt.timedelta(minutes=rnd.randint(1, 240))
+        if t > now:                    # never write the future, nor slip into yesterday after midnight
+            midnight = dt.datetime.combine(now.date(), dt.time(), tzinfo=dt.timezone.utc)
+            t = max(midnight, now - dt.timedelta(minutes=rnd.randint(1, 240)))
         lines.append((t, {"timestamp": iso(t), "message": {"role": "user", "content": "…"}}))
         _, provider, model, (p_in, p_out, p_cr, p_cw) = rnd.choices(MODELS, weights=[m[0] for m in MODELS])[0]
         inp, out = rnd.randint(2, 14), rnd.randint(300, 1800)
         cr, cw = rnd.randint(1_200, 9_000), rnd.randint(0, 1_200)
         c = {"input": inp * p_in / 1e6, "output": out * p_out / 1e6, "cacheRead": cr * p_cr / 1e6, "cacheWrite": cw * p_cw / 1e6}
         c["total"] = round(sum(c.values()), 6)
-        lines.append((t + dt.timedelta(seconds=20), {"timestamp": iso(t + dt.timedelta(seconds=20)), "message": {
+        reply = min(t + dt.timedelta(seconds=20), max(t, now))
+        lines.append((reply, {"timestamp": iso(reply), "message": {
             "role": "assistant", "provider": provider, "model": model,
             "usage": {"input": inp, "output": out, "cacheRead": cr, "cacheWrite": cw, "cost": c}}}))
     lines.sort(key=lambda x: x[0])
