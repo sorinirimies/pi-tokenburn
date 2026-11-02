@@ -190,10 +190,10 @@ Refreshing is designed to cost nothing you can notice:
 
 ## Demo recordings
 
-The GIFs above live in [`examples/vhs/generated/`](examples/vhs/generated) and are stored with **Git LFS** (`git lfs install` once). They are recorded with [VHS](https://github.com/charmbracelet/vhs) from a **real pi** that loads only this extension, on **synthetic** data (`examples/vhs/fixture.sh`: 900 days of made-up sessions across fictional projects, providers and models in `/tmp`, with deliberately small numbers, and a local mock model for the live-refresh demo), never from real logs, paths or credentials:
+The GIFs above live in [`examples/vhs/generated/`](examples/vhs/generated) and are stored with **Git LFS** (`git lfs install` once). They are recorded with [VHS](https://github.com/charmbracelet/vhs) from a **real pi** that loads only this extension, on **synthetic** data (`examples/vhs/fixture.nu`: 900 days of made-up sessions across fictional projects, providers and models in `/tmp`, with deliberately small numbers, and a local mock model for the live-refresh demo), never from real logs, paths or credentials:
 
 ```sh
-just vhs-all          # every tape (examples/vhs/*.tape): needs vhs, ttyd, ffmpeg, pi, bun, python3
+just vhs-all          # every tape (examples/vhs/*.tape): needs vhs, ttyd, ffmpeg, pi, bun, nu
 just vhs-tape charts  # one tape
 just vhs-list         # list the tapes
 just demo             # try it yourself in a real pi on the same synthetic data

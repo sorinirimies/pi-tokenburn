@@ -11,6 +11,8 @@ const read = (p: string) => readFileSync(p, "utf8").replace(/\r\n/g, "\n");
 const tapes = readdirSync(VHS).filter((f) => f.endsWith(".tape")).sort();
 const gifRefsInReadme = [...read(join(ROOT, "README.md")).matchAll(/examples\/vhs\/generated\/([\w-]+\.gif)/g)].map((m) => m[1]);
 const posix = process.platform !== "win32";
+// The fixture is Nushell; the gate job has it, the OS / time-zone matrix jobs may not.
+const nu = Bun.which("nu") !== null;
 
 describe("VHS tapes", () => {
 	it("there is a tape for every feature we show off", () => {
@@ -30,8 +32,8 @@ describe("VHS tapes", () => {
 				expect(text, setting).toContain(setting);
 			}
 			// recordings only ever run on the synthetic fixture, with the real pi but only this extension
-			expect(text).toContain("examples/vhs/fixture.sh");
-			expect(text).toContain("examples/vhs/pi-demo.sh");
+			expect(text).toContain("examples/vhs/fixture.nu");
+			expect(text).toContain("examples/vhs/pi-demo.nu");
 			expect(text).toContain("Wait+Screen@30s");
 			expect(text).toContain("never reads your real sessions");
 		});
@@ -85,7 +87,7 @@ describe("README previews and Git LFS", () => {
 
 	it("scripts and tapes are pinned to LF line endings", () => {
 		const attrs = read(join(ROOT, ".gitattributes"));
-		expect(attrs).toContain("*.sh text eol=lf");
+		expect(attrs).toContain("* text=auto eol=lf");
 		expect(attrs).toContain("*.tape text eol=lf");
 	});
 
@@ -101,8 +103,8 @@ describe("README previews and Git LFS", () => {
 	});
 });
 
-describe.skipIf(!posix)("synthetic fixture (examples/vhs/fixture.sh)", () => {
-	const run = (...args: string[]) => Bun.spawnSync(["bash", join(VHS, "fixture.sh"), ...args], { cwd: ROOT });
+describe.skipIf(!posix || !nu)("synthetic fixture (examples/vhs/fixture.nu)", () => {
+	const run = (...args: string[]) => Bun.spawnSync(["nu", join(VHS, "fixture.nu"), ...args], { cwd: ROOT });
 	const sessions = () => {
 		const env = Object.fromEntries(run("env").stdout.toString().split("\n").filter(Boolean).map((l) => l.replace(/^export /, "").split("=")));
 		return { env, dir: join(env.PI_CODING_AGENT_DIR, "sessions") };
@@ -191,8 +193,8 @@ describe.skipIf(!posix)("synthetic fixture (examples/vhs/fixture.sh)", () => {
 		expect(leaks).toEqual([]);
 	});
 
-	it("pi-demo.sh and fixture.sh are valid bash", () => {
-		for (const f of ["pi-demo.sh", "fixture.sh"]) expect(Bun.spawnSync(["bash", "-n", join(VHS, f)]).exitCode, f).toBe(0);
+	it("pi-demo.nu and fixture.nu are valid Nushell", () => {
+		for (const f of ["pi-demo.nu", "fixture.nu"]) expect(Bun.spawnSync(["nu", "-c", `if not (nu-check '${join(VHS, f)}') { exit 1 }`]).exitCode, f).toBe(0);
 	});
 });
 

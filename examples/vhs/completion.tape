@@ -2,7 +2,7 @@
 # Tab-completion for every command and argument, using pi's own autocomplete menu.
 #
 # Runs a real pi with only the pi-tokenburn extension loaded, on the throw-away
-# data from fixture.sh (HOME and the pi agent dir redirected into /tmp), so it
+# data from fixture.nu (HOME and the pi agent dir redirected into /tmp), so it
 # never reads your real sessions, settings or credentials.
 
 Output examples/vhs/generated/completion.gif
@@ -16,12 +16,12 @@ Set PlaybackSpeed 1.0
 Set Theme "Catppuccin Mocha"
 
 Hide
-Type 'bash examples/vhs/fixture.sh >/dev/null && echo DONE-$((6*7))'
+Type 'nu examples/vhs/fixture.nu >/dev/null && echo DONE-$((6*7))'
 Enter
 Wait+Screen@60s /DONE-42/
-Type 'eval "$(examples/vhs/fixture.sh env)" && clear'
+Type 'eval "$(nu examples/vhs/fixture.nu env)" && clear'
 Enter
-Type "bash examples/vhs/pi-demo.sh"
+Type "nu examples/vhs/pi-demo.nu"
 Enter
 Wait+Screen@30s /\[today\]/
 Show

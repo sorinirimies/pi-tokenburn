@@ -18,7 +18,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "audit": "bun audit",
-    "fuzz": "FUZZ_ITERS=20000 bun test tests/fuzz.test.ts --config=bunfig.fuzz.toml",
+    "fuzz": "nu scripts/ci/fuzz.nu",
     "check": "nu scripts/ci/quality_gate.nu"
   },
   "overrides": {
