@@ -20,8 +20,8 @@ export function windowRate(stat: PeriodStats, w: Window, firstTs: number | undef
 	return { tokensPerHour: stat.tokens / hours, costPerHour: stat.cost / hours };
 }
 
-/** Estimated dollars saved in a window: cache reads, plus what pi-context-diet kept out of requests. */
-export const statSavings = (s: PeriodStats): number => Math.max(0, s.cacheBase - s.cacheActual) + s.dietUsd;
+/** Estimated dollars saved in a window: cache reads, plus what pi-context-diet and pi-squeeze kept out. */
+export const statSavings = (s: PeriodStats): number => Math.max(0, s.cacheBase - s.cacheActual) + s.dietUsd + s.squeezeUsd;
 
 /** Status-line extras for the window, in order: burn rate, cache hit ratio, cache savings (each only when enabled and meaningful). */
 export function statusExtras(report: TokenBurnReport, cfg: TokenBurnConfig, now: number): string[] {

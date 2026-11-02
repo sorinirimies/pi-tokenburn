@@ -41,7 +41,7 @@ const TOP_LEVEL: CompletionItem[] = [
 	{ value: "price ", label: "price", description: "Set a $/M-token price for a model" },
 	{ value: "rate", label: "rate", description: "Toggle the tokens/hour burn rate in the status line" },
 	{ value: "hit", label: "hit", description: "Toggle the cache hit ratio in the status line" },
-	{ value: "saved", label: "saved", description: "Toggle the estimated savings (cache + context-diet) in the status line" },
+	{ value: "saved", label: "saved", description: "Toggle the estimated savings (cache, pi context-diet, pi squeeze) in the status line" },
 	{ value: "cycle", label: "cycle", description: "Rotate the status-bar period" },
 	{ value: "window", label: "window", description: "Toggle the panel below the editor" },
 	{ value: "budget ", label: "budget", description: "Set a day/week/month budget" },

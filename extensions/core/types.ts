@@ -26,6 +26,10 @@ export interface PeriodStats {
 	dietTokens: number;
 	dietRequests: number;
 	dietUsd: number;
+	/** pi-squeeze: tokens cut from bash output, the outputs, and what they would have cost as input. */
+	squeezeTokens: number;
+	squeezeOutputs: number;
+	squeezeUsd: number;
 }
 
 export interface TokenBurnReport {

@@ -28,7 +28,10 @@ export function renderReport(input: {
 			? [`cache: ${Math.round(cacheHitRatio(models) * 100)}% of prompt tokens read from cache${cacheSavings(models) > 0 ? ` · saved ~${formatCost(cacheSavings(models))}` : ""}`]
 			: []),
 		...(report.total.dietTokens > 0
-			? [`context-diet: ~${formatNum(report.total.dietTokens)} tokens kept out of ${report.total.dietRequests} requests${report.total.dietUsd > 0 ? ` · saved ~${formatCost(report.total.dietUsd)}` : ""}`]
+			? [`pi context-diet: ~${formatNum(report.total.dietTokens)} tokens kept out of ${report.total.dietRequests} requests${report.total.dietUsd > 0 ? ` · saved ~${formatCost(report.total.dietUsd)}` : ""}`]
+			: []),
+		...(report.total.squeezeTokens > 0
+			? [`pi squeeze: ~${formatNum(report.total.squeezeTokens)} tokens cut from ${report.total.squeezeOutputs} bash outputs${report.total.squeezeUsd > 0 ? ` · saved ~${formatCost(report.total.squeezeUsd)}` : ""}`]
 			: []),
 		...forecastLines(report, config, now),
 	];

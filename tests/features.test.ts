@@ -319,7 +319,7 @@ describe("tokenburn features", () => {
 	});
 
 	describe("status line extras follow the status window", () => {
-		const stat = (o: any = {}) => ({ tokens: 2400, cost: 1, input: 10, output: 5, cacheRead: 90, cacheWrite: 0, sessions: 1, cacheBase: 0.5, cacheActual: 0.1, cacheReadPriced: 90, dietTokens: 0, dietRequests: 0, dietUsd: 0, ...o });
+		const stat = (o: any = {}) => ({ tokens: 2400, cost: 1, input: 10, output: 5, cacheRead: 90, cacheWrite: 0, sessions: 1, cacheBase: 0.5, cacheActual: 0.1, cacheReadPriced: 90, dietTokens: 0, dietRequests: 0, dietUsd: 0, squeezeTokens: 0, squeezeOutputs: 0, squeezeUsd: 0, ...o });
 		const n = NOW.getTime();
 		const rep = (o: any = {}) => ({ hour: stat({ tokens: 100 }), today: stat(), week: stat({ tokens: 4800 }), month: stat(), year: stat(), total: stat(), firstTs: n - 24 * 3_600_000, ...o }) as any;
 		const cfg = (o: any = {}) => ({ ...freshConfig(), ...o });

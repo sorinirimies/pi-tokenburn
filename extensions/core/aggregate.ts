@@ -1,5 +1,5 @@
 /** Aggregation of parsed turns into period totals and time series. */
-import { loadDietLog } from "./diet.ts";
+import { DIET_LOG, loadPluginLog, pluginLogPath, SQUEEZE_LOG } from "./plugin-logs.ts";
 import { loadAll, type Turn } from "./parser.ts";
 import { cacheValue, hasFilter, selectTurns, type UsageOptions } from "./select.ts";
 import { bucketLabel, bucketStart, type Unit } from "./time.ts";
@@ -19,6 +19,9 @@ const emptyStats = (): PeriodStats => ({
 	dietTokens: 0,
 	dietRequests: 0,
 	dietUsd: 0,
+	squeezeTokens: 0,
+	squeezeOutputs: 0,
+	squeezeUsd: 0,
 });
 
 export const HOUR_MS = 3_600_000;
@@ -38,8 +41,8 @@ export async function collectUsage(
 	now: Date = new Date(),
 	includeCache = true,
 	opts?: UsageOptions,
-	/** pi-context-diet's savings log (default: in pi's agent dir). */
-	dietLog?: string,
+	/** Where the pi plugins' savings logs are (default: pi's agent dir). */
+	logDir?: string,
 ): Promise<TokenBurnReport> {
 	const startOfHour = now.getTime() - HOUR_MS;
 	const startOfDay = bucketStart(now.getTime(), "day");
@@ -89,7 +92,7 @@ export async function collectUsage(
 		if (maxTs >= startOfHour) report.hour.sessions++;
 	}
 
-	// pi-context-diet's log is not attributed to providers, models or projects: only unfiltered views count it.
+	// The pi plugins' logs are not attributed to providers, models or projects: only unfiltered views count them.
 	if (!hasFilter(opts?.filter)) {
 		const windows: [PeriodStats, number][] = [
 			[report.total, -Infinity],
@@ -99,15 +102,23 @@ export async function collectUsage(
 			[report.today, startOfDay],
 			[report.hour, startOfHour],
 		];
-		for (const r of await loadDietLog(dietLog)) {
-			for (const [p, start] of windows) {
+		const [diet, squeeze] = await Promise.all([loadPluginLog(pluginLogPath(DIET_LOG, logDir)), loadPluginLog(pluginLogPath(SQUEEZE_LOG, logDir))]);
+		for (const [p, start] of windows) {
+			for (const r of diet) {
 				if (r.ts < start) continue;
 				p.dietTokens += r.tokens;
 				p.dietRequests++;
 			}
+			for (const r of squeeze) {
+				if (r.ts < start) continue;
+				p.squeezeTokens += r.tokens;
+				p.squeezeOutputs++;
+			}
+			// Priced at the window's own prices: elided context would mostly have been cache reads,
+			// squeezed bash output would have been fresh input.
+			p.dietUsd = p.cacheReadPriced > 0 ? (p.dietTokens * p.cacheActual) / p.cacheReadPriced : 0;
+			p.squeezeUsd = p.cacheReadPriced > 0 ? (p.squeezeTokens * p.cacheBase) / p.cacheReadPriced : 0;
 		}
-		// Elided tokens would mostly have been cache reads: price them at the window's own cache-read price.
-		for (const [p] of windows) p.dietUsd = p.cacheReadPriced > 0 ? (p.dietTokens * p.cacheActual) / p.cacheReadPriced : 0;
 	}
 
 	return report;
