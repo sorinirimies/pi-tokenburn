@@ -46,23 +46,22 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 
 | Command | What it does |
 |---|---|
-| `/tokenburn day\|week\|month\|year\|all` | **Switch the bottom status line**: today, this week, this month, this year, or the all-time total |
+| `/tokenburn hour\|day\|week\|month\|year\|all` | **Switch the bottom status line**: last 60 minutes, today, this week (from Monday), this month, this year, or the all-time total. `today` and `total` work as aliases of `day` and `all` |
 | `/tokenburn chart <view>` | Report + **chart**. Views: `day` (14 days), `week` (8 weeks), `month` (6 months), `year` (5 years), `all` (whole history; monthly columns up to 18 months, yearly beyond) |
 | `/tokenburn` | Report + daily chart (same as `/tokenburn chart day`) |
-| `/tokenburn cycle` | Rotate the status line: today → week → month → year → total |
-| `/tokenburn status <today\|week\|month\|year\|total>` | Explicit form of the first row |
-| `/tokenburn models hour|day|week|month|year|all` | **Table** of usage per model (tokens, in/out, cache hit %, cache savings, cost, share). Period (optional): `hour` (last 60 min), `day`, `week`, `month`, `year`, `all` (default `all`) |
-| `/tokenburn providers hour|day|week|month|year|all` | Same table per provider |
-| `/tokenburn projects hour|day|week|month|year|all` | Same table per project (session working directory); all projects by default |
-| `/tokenburn sessions hour|day|week|month|year|all` | Leaderboard of the `n` (default 10) costliest sessions |
+| `/tokenburn cycle` | Rotate the status line: hour → today → week → month → year → total |
+| `/tokenburn status <hour\|today\|week\|month\|year\|total>` | Explicit form of the first row |
+| `/tokenburn models hour\|day\|week\|month\|year\|all` | **Table** of usage per model (tokens, in/out, cache hit %, cache savings, cost, share). `period` (optional, default `all`): `hour` (rolling last 60 min), `day` (since local midnight), `week` (since Monday), `month`, `year`, `all`. Optional `provider=x`, `model=x`, `project=x` (substring, this call only) narrow any table, e.g. `models week provider=anthropic` |
+| `/tokenburn providers hour\|day\|week\|month\|year\|all` | Same table per provider; same period and filter arguments |
+| `/tokenburn projects hour\|day\|week\|month\|year\|all` | Same table per project (session working directory) |
+| `/tokenburn sessions hour\|day\|week\|month\|year\|all` | Leaderboard of the `n` costliest sessions: add a number for `n` (default 10), e.g. `sessions week 5` (`top` is an alias) |
 | `/tokenburn session` | Spend of the **current** session, and its share of today |
 | `/tokenburn filter <provider\|model\|project> <value>` | Limit everything (status line, report, tables, export) to matching usage (case-insensitive substring). `filter` shows it, `filter all` clears it |
-| `/tokenburn export csv|json` | Optional `[period]` and `[path]` follow the format. Writes one row per day × provider × model × project (default `tokenburn-<period>.<format>` in the current directory) |
+| `/tokenburn export csv\|json` | Optional `[period]` and `[path]` follow the format. Writes one row per day × provider × model × project (default `tokenburn-<period>.<format>` in the current directory) |
 | `/tokenburn warn <pct>` | Notify once when a budget reaches `pct` percent (default 80) and once when it is exceeded |
 | `/tokenburn rate` | Toggle the burn rate in the status line (`42k/h`: tokens per hour averaged over the status period) |
 | `/tokenburn hit` | Toggle the cache hit ratio (`95% hit`) in the status line |
 | `/tokenburn saved` | Toggle the estimated cache savings (`~$12.40 saved`) in the status line |
-| `/tokenburn hour` | Show the last 60 minutes in the status line (joins `day`, `week`, `month`, `year`, `all`) |
 | `/tokenburn pricing` | Where costs come from (session logs vs your price table) and which models are unpriced |
 | `/tokenburn price <model> <in> <out>` | Set a price in $ per million tokens (key `model` or `provider/model`); `price remove <model>` deletes it. `pricing mode <fill\|override>`: use the table only where the log has no cost (default), or always |
 | `/tokenburn window` | Toggle the panel below the editor |
@@ -77,7 +76,7 @@ pi install git:github.com/sorinirimies/pi-tokenburn
 
 Recorded from a real pi with only this plugin loaded, on synthetic data.
 
-**Switch what the bottom line shows** (`/tokenburn hour|day|week|month|year|all`, or `cycle`):
+**Switch what the bottom line shows** (`/tokenburn hour`, `day`, `week`, `month`, `year`, `all`, or `cycle`):
 
 ![Status line: week, month, year, all, day, then cycle through every period](examples/vhs/generated/status.gif)
 

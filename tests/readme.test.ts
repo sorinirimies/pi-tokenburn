@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PERIODS } from "../extensions/features/breakdown/query.ts";
+import { STATUS_WINDOWS } from "../extensions/core/types.ts";
 import tokenBurn, { clearCache, parseCommand } from "../extensions/tokenburn.ts";
 
 const PLACEHOLDERS: Record<string, string[]> = {
 	"<view>": ["day", "week", "month", "year", "all"],
-	"<window>": ["today", "week", "month", "year", "total"],
+	"<window>": ["hour", "today", "week", "month", "year", "total"],
 	"<tokens>": ["5000000"],
 	"$<cost>": ["$50"],
 	"<value>": ["anthropic"],
@@ -96,5 +98,14 @@ describe("every command documented in the README works", () => {
 			expect(notes.at(-1), `"/tokenburn ${cmd}"`).not.toContain("Unknown");
 			expect(notes.at(-1), `"/tokenburn ${cmd}"`).not.toContain("Usage:");
 		}
+	});
+
+	it("documents every period and status window the code accepts", () => {
+		const md = readFileSync(join(import.meta.dir, "..", "README.md"), "utf8").replace(/\\\|/g, "|");
+		const table = (by: string) => md.match(new RegExp(`\\\`/tokenburn ${by} ([^\\\`]*)\\\``))?.[1].split("|");
+		for (const by of ["models", "providers", "projects", "sessions"]) expect(table(by), by).toEqual([...PERIODS]);
+		const status = md.match(/`\/tokenburn status <([^>]*)>`/)?.[1].split("|");
+		expect(status).toEqual([...STATUS_WINDOWS]);
+		expect(md).toContain("`/tokenburn hour|day|week|month|year|all`");
 	});
 });
