@@ -3,6 +3,12 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.8.2](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.2) — 2026-11-02
+
+
+### 🧪 Tests
+
+- Compare the cache's string table without assuming the directory order ([`3ec7cc1`](https://github.com/sorinirimies/pi-tokenburn/commit/3ec7cc1b15426d2c1c2e804d7ce9b5a7fe713cdd))
 ## [0.8.1](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.1) — 2026-11-02
 
 
