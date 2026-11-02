@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tokenBurn, { clearCache } from "../extensions/tokenburn.ts";
+import tokenBurn, { startupRefresh, clearCache } from "../extensions/tokenburn.ts";
 
 describe("pi-tokenburn extension wiring", () => {
 	let dir: string;
@@ -42,7 +42,7 @@ describe("pi-tokenburn extension wiring", () => {
 		widgets = {};
 		notes = [];
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 	});
 
 	afterEach(() => {
@@ -115,7 +115,7 @@ describe("pi-tokenburn chart + window commands", () => {
 		notes = [];
 		const handlers: Record<string, Function> = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 	});
 
 	afterEach(() => {
@@ -197,7 +197,7 @@ describe("pi-tokenburn chart + window commands", () => {
 		const h: Record<string, Function> = {};
 		let st = "";
 		tokenBurn({ on: (e: string, f: Function) => (h[e] = f), registerCommand: () => {} } as any);
-		await h.session_start({}, { ...ctx(), ui: { ...ctx().ui, setStatus: (_: string, v: string) => (st = v) } });
+		await h.session_start({}, { ...ctx(), ui: { ...ctx().ui, setStatus: (_: string, v: string) => (st = v) } }); await startupRefresh();
 		expect(st).not.toContain("OVER BUDGET");
 	});
 

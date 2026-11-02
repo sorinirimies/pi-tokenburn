@@ -183,6 +183,7 @@ Environment overrides for the session directory: `TOKENBURN_PI_SESSIONS`, `PI_CO
 Refreshing is designed to cost nothing you can notice:
 
 - **Incremental:** pi's session logs are append-only, so after the first parse only the bytes added since then are read (with a cheap integrity check that falls back to a full parse if a file was rewritten or truncated). On a 35 MB active session a refresh after one new message takes **~1.2 ms**, down from ~18 ms, and the cost no longer grows with the session.
+- **Fast start:** pi waits for nothing: the first refresh runs in the background. The parse state is saved in `tokenburn-cache.json` (pi's agent dir, at most once a minute and at shutdown), so a new pi run reads only what was appended since; on a 2.4 GB session history the status line appears in **~40 ms** instead of ~4 s, and pi starts ~5 s sooner. Delete the file any time: the next start parses everything once.
 - **Coalesced:** a burst of messages triggers one refresh (trailing delay, `refreshMs`), never two at once.
 - **Never blocks:** refreshes are fire-and-forget and errors are swallowed; the timer is unref'd and cancelled at shutdown.
 - **Off means off:** `/tokenburn disable` (or `"enabled": false`) reads no files and starts no timers.
@@ -200,7 +201,7 @@ just demo             # try it yourself in a real pi on the same synthetic data
 
 ## Security notes
 
-- **Local and read-only.** It reads pi's session logs and its own `tokenburn.json`. Nothing leaves your machine: no network, no telemetry, no shell commands, **zero runtime dependencies**.
+- **Local.** It reads pi's session logs, its own `tokenburn.json` and the savings logs of pi-context-diet / pi-squeeze, and writes only `tokenburn.json` and its parse cache `tokenburn-cache.json`. Nothing leaves your machine: no network, no telemetry, no shell commands, **zero runtime dependencies**.
 - **Never breaks pi.** Stats refreshes are fire-and-forget and swallow their own errors, so a failure here cannot interrupt a turn or a session start.
 - **Hand-edited config is sanitised.** Unknown or non-numeric budget values are dropped.
 
@@ -224,7 +225,7 @@ One folder per feature under `extensions/features/`, each with its logic and its
 ```
 extensions/
   tokenburn.ts            wiring only: pi events + the /tokenburn command
-  core/                   types, config, session-log parser (incremental cache), aggregation, filters + prices, paint
+  core/                   types, config, session-log parser (incremental cache, saved between runs), aggregation, filters + prices, paint
   command/                parse + completions (pure), handler table, the Host handlers receive
   features/
     status-line/          footer text, optional panel, burn rate / cache hit / savings

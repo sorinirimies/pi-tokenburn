@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tokenBurn, { clearCache, fileStat, resolveAgentDir, resolveSessionsDir, sanitizeBudgets } from "../extensions/tokenburn.ts";
+import tokenBurn, { startupRefresh, clearCache, fileStat, resolveAgentDir, resolveSessionsDir, sanitizeBudgets } from "../extensions/tokenburn.ts";
 
 describe("path resolution", () => {
 	it("resolveAgentDir: PI_CODING_AGENT_DIR, then XDG, then ~/.pi/agent", () => {
@@ -70,7 +70,7 @@ describe("extension lifecycle", () => {
 		if (config) writeFileSync(join(dir, "tokenburn.json"), JSON.stringify(config));
 		handlers = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 	};
 
 	beforeEach(() => {
@@ -141,7 +141,7 @@ describe("extension lifecycle", () => {
 		handlers = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: () => {} } as any);
 		const quiet = { hasUI: false, ui: { theme, setStatus: () => { throw new Error("no UI"); }, setWidget: () => { throw new Error("no UI"); }, notify: () => {} } };
-		await handlers.session_start({}, quiet);
+		await handlers.session_start({}, quiet); await startupRefresh();
 		await handlers.turn_end({}, quiet);
 	});
 

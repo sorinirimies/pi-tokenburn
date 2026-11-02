@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 // pi's REAL autocomplete provider: the one that crashed with "reading 'endsWith'" on a mock-tested build.
 import { CombinedAutocompleteProvider } from "@earendil-works/pi-tui";
-import tokenBurn, { clearCache, completions, parseCommand } from "../extensions/tokenburn.ts";
+import tokenBurn, { startupRefresh, clearCache, completions, parseCommand } from "../extensions/tokenburn.ts";
 
 /** Every argument text a user can plausibly have typed when the menu is open. */
 const TYPED = [
@@ -43,7 +43,7 @@ describe("pi's real autocomplete provider × the tokenburn command", () => {
 		status = {};
 		const handlers: Record<string, Function> = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 		provider = new CombinedAutocompleteProvider([{ name: "tokenburn", description: command.description, getArgumentCompletions: command.getArgumentCompletions }], dir);
 	});
 

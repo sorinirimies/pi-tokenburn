@@ -230,11 +230,25 @@ function listSessionFiles(root: string): string[] {
 	return files;
 }
 
-/** Bring the per-file cache up to date (reading only what changed) and return every file's turns. */
-export async function loadAll(sessionsRoot: string, chunkSize = CHUNK_BYTES): Promise<Turn[][]> {
+/** Bring the per-file cache up to date (reading only what changed) and return every file's turns.
+ * Calls run one at a time: an incremental parse appends to the cached turns, so two at once
+ * (the background startup refresh and a /tokenburn command) would count the new turns twice. */
+export function loadAll(sessionsRoot: string, chunkSize = CHUNK_BYTES): Promise<Turn[][]> {
+	const run = queue.then(() => loadAllNow(sessionsRoot, chunkSize));
+	queue = Promise.allSettled([run]);
+	return run;
+}
+
+let queue: Promise<unknown> = Promise.resolve();
+
+/** Bumped whenever a cache entry changes, so the cache file is only rewritten when needed. */
+let generation = 0;
+export const cacheGeneration = () => generation;
+
+async function loadAllNow(sessionsRoot: string, chunkSize: number): Promise<Turn[][]> {
 	const files = listSessionFiles(sessionsRoot);
 	const live = new Set(files);
-	for (const key of FILE_CACHE.keys()) if (!live.has(key)) FILE_CACHE.delete(key);
+	for (const key of FILE_CACHE.keys()) if (!live.has(key) && FILE_CACHE.delete(key)) generation++;
 
 	const out: Turn[][] = [];
 	for (const file of files) {
@@ -245,6 +259,7 @@ export async function loadAll(sessionsRoot: string, chunkSize = CHUNK_BYTES): Pr
 			const fresh = await refreshEntry(file, st, entry, chunkSize);
 			if (fresh) FILE_CACHE.set(file, fresh);
 			else FILE_CACHE.delete(file);
+			generation++;
 			entry = fresh;
 		}
 		if (entry) out.push(entry.tail.length > 0 ? entry.turns.concat(entry.tail) : entry.turns);
@@ -259,3 +274,14 @@ export const __refreshEntryForTests = refreshEntry;
 export function clearCache(): void {
 	FILE_CACHE.clear();
 }
+
+/** The parse state of every session file, to save it. */
+export const exportCache = (): [string, FileEntry][] => [...FILE_CACHE];
+
+/** Seed a fresh runtime with saved parse state. A warm cache is newer than any file: kept. */
+export function importCache(entries: Iterable<[string, FileEntry]>): void {
+	if (FILE_CACHE.size > 0) return;
+	for (const [file, entry] of entries) FILE_CACHE.set(file, entry);
+}
+
+export type { FileEntry };

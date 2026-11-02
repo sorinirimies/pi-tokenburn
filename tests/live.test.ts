@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, appendFileSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tokenBurn, { clearCache, resetStats, sanitizeRefreshMs, stats } from "../extensions/tokenburn.ts";
+import tokenBurn, { startupRefresh, clearCache, resetStats, sanitizeRefreshMs, stats } from "../extensions/tokenburn.ts";
 
 const line = (input: number) =>
 	JSON.stringify({ timestamp: new Date().toISOString(), message: { role: "assistant", usage: { input, output: 0, cost: { total: 0.1 } } } }) + "\n";
@@ -47,7 +47,7 @@ describe("live refresh, enable / disable", () => {
 		writeFileSync(join(dir, "tokenburn.json"), JSON.stringify({ refreshMs: 250, ...config }));
 		handlers = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 	};
 	const assistant = { message: { role: "assistant" } };
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PERIODS } from "../extensions/features/breakdown/query.ts";
 import { STATUS_WINDOWS } from "../extensions/core/types.ts";
-import tokenBurn, { clearCache, parseCommand } from "../extensions/tokenburn.ts";
+import tokenBurn, { startupRefresh, clearCache, parseCommand } from "../extensions/tokenburn.ts";
 
 const PLACEHOLDERS: Record<string, string[]> = {
 	"<view>": ["day", "week", "month", "year", "all"],
@@ -72,7 +72,7 @@ describe("every command documented in the README works", () => {
 		notes = [];
 		const handlers: Record<string, Function> = {};
 		tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-		await handlers.session_start({}, ctx());
+		await handlers.session_start({}, ctx()); await startupRefresh();
 	});
 
 	afterEach(() => {

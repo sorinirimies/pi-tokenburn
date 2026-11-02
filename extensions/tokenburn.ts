@@ -22,6 +22,7 @@ import type { Host } from "./command/host.ts";
 import { completions } from "./command/completions.ts";
 import { parseCommand } from "./command/parse.ts";
 import { collectUsage } from "./core/aggregate.ts";
+import { persistCache, restoreCache } from "./core/cache-file.ts";
 import { freshConfig, getSessionsDir, loadConfig, saveConfig, type TokenBurnConfig } from "./core/config.ts";
 import type { UsageFilter, UsageOptions } from "./core/select.ts";
 import { budgetWarnings } from "./features/budgets/budgets.ts";
@@ -48,6 +49,10 @@ export * from "./features/breakdown/query.ts";
 export * from "./features/breakdown/table.ts";
 export * from "./features/pricing/report.ts";
 export * from "./features/export/export.ts";
+
+/** The background refresh started by the latest session_start (tests await it). */
+let startup: Promise<void> = Promise.resolve();
+export const startupRefresh = () => startup;
 
 export default function tokenBurnExtension(pi: ExtensionAPI) {
 	let config: TokenBurnConfig = freshConfig();
@@ -84,6 +89,7 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 
 		if (config.showWidget) ctx.ui.setWidget("tokenburn-panel", renderWidget(report, config, theme), { placement: "belowEditor" });
 		else ctx.ui.setWidget("tokenburn-panel", []);
+		void persistCache();
 	};
 
 	// The latest context, used by the (delayed) live refresh. Dropped at shutdown so a reloaded
@@ -99,8 +105,10 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		latestCtx = ctx;
 		config = await loadConfig();
-		// A failing refresh must never break session start.
-		await updateUI(ctx).catch(() => {});
+		if (config.enabled) await restoreCache();
+		// pi waits for this handler, and the first scan of a long session history takes seconds:
+		// draw in the background. A failing refresh must never break session start.
+		startup = updateUI(ctx).catch(() => {});
 	});
 
 	// Live: after each assistant message, coalesced. Never blocks, never throws into pi, and
@@ -120,9 +128,10 @@ export default function tokenBurnExtension(pi: ExtensionAPI) {
 		void refresher.flush();
 	});
 
-	pi.on("session_shutdown", () => {
+	pi.on("session_shutdown", async () => {
 		refresher.cancel();
 		latestCtx = undefined;
+		await persistCache(undefined, { force: true });
 	});
 
 	pi.registerCommand("tokenburn", {

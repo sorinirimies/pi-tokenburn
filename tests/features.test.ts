@@ -7,6 +7,7 @@ import tokenBurn, {
 	completions, csvCell, describeFilter, forecastLines, formatExport, formatWhen, freshConfig, hasFilter, matchesFilter, nextBucket, parseCommand,
 	periodStart, project, statSavings, statusExtras, windowRate, windowStart, renderPricing, renderTable, sanitizeFilter, sanitizePrices, sanitizeWarnPct, selectTurns, sessionSummary, shortPath, stamp, sumRows,
 	__loadAllForTests,
+	startupRefresh,
 } from "../extensions/tokenburn.ts";
 
 const NOW = new Date(2026, 9, 14, 12, 0, 0); // Wed 2026-10-14 12:00 local
@@ -475,7 +476,7 @@ describe("tokenburn features", () => {
 			notes = [];
 			status = "";
 			tokenBurn({ on: (e: string, f: Function) => (handlers[e] = f), registerCommand: (_: string, c: any) => (command = c) } as any);
-			await handlers.session_start({}, ctx());
+			await handlers.session_start({}, ctx()); await startupRefresh();
 		});
 		afterEach(() => {
 			if (prev === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -590,7 +591,7 @@ describe("tokenburn features", () => {
 
 		it("loads filter, prices, priceMode, warnPct and showRate from the config file", async () => {
 			writeFileSync(join(agent, "tokenburn.json"), JSON.stringify({ filter: { model: "x" }, prices: { m: { input: 1, output: 2 } }, priceMode: "override", warnPct: 50, showRate: false, showHit: false, showSaved: false }));
-			await handlers.session_start({}, ctx());
+			await handlers.session_start({}, ctx()); await startupRefresh();
 			expect(status).toContain("model=x");
 			await run("filter clear");
 			const saved = JSON.parse(readFileSync(join(agent, "tokenburn.json"), "utf8"));
