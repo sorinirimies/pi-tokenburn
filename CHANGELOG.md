@@ -3,6 +3,22 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.8.3](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.3) — 2026-11-08
+
+
+### 🐛 Fixes
+
+- **ci:** Nightly commit step parses bool arg; retry all errors on gitleaks download ([`e370366`](https://github.com/sorinirimies/pi-tokenburn/commit/e3703667b192c8b994d7a6e7ee28226e483e8b6c))
+
+### 🔧 Build & CI
+
+- Align tooling with the plugin template ([`fb52f2c`](https://github.com/sorinirimies/pi-tokenburn/commit/fb52f2cf61bc7cc20709ea5c7e05b5a648cc15f5))
+- Scan the git history for secrets with gitleaks ([`d29156d`](https://github.com/sorinirimies/pi-tokenburn/commit/d29156d3c2f3de766f93943a9fae276919faa59c))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-11-03 (not released) ([`974289a`](https://github.com/sorinirimies/pi-tokenburn/commit/974289a975f35140c2a53b4c9f3767eba4e583f3))
+- Nightly dev-tooling lockfile update 2026-11-08 (not released) ([`347cd2e`](https://github.com/sorinirimies/pi-tokenburn/commit/347cd2ea8962b53e0c3f3e1705dfbe3e41068066))
 ## [0.8.2](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.2) — 2026-11-02
 
 
