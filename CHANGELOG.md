@@ -3,6 +3,20 @@
 Generated from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org). Do not edit by hand.
 
+## [0.8.4](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.4) — 2026-11-10
+
+
+### 🐛 Fixes
+
+- **ci:** Read npm pack --json from npm 12 object output ([`418d6ff`](https://github.com/sorinirimies/pi-tokenburn/commit/418d6ffc129ef6cb7d52e8c96306641df22e75a3))
+
+### 🔧 Build & CI
+
+- **deps:** Bump Gitea workflow actions ([`8f3fcb4`](https://github.com/sorinirimies/pi-tokenburn/commit/8f3fcb4f078a8dbe7f646be1e07c8eceaf501fa6))
+
+### 🧹 Chores
+
+- Nightly dev-tooling lockfile update 2026-11-09 (not released) ([`88178d2`](https://github.com/sorinirimies/pi-tokenburn/commit/88178d231dcee02b951434a1fd134cf8fe174017))
 ## [0.8.3](https://github.com/sorinirimies/pi-tokenburn/releases/tag/v0.8.3) — 2026-11-08
 
 
