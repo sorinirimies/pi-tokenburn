@@ -60,7 +60,10 @@ def main [--skip-typecheck, --skip-test, --skip-pack, --skip-deps, --skip-nu] {
             print $res.stderr
             $ok = false
         } else {
-            let files = ($res.stdout | from json | get 0.files | get path)
+            # npm 7-11 prints a list; npm 12 keys the entry by package name
+            let parsed = ($res.stdout | from json)
+            let entry = if ($parsed | describe | str starts-with "list") { $parsed | first } else { $parsed | values | first }
+            let files = ($entry | get files | get path)
             let missing = (required_files (open package.json) | where {|f| $f not-in $files })
             let bad = (forbidden $files)
             if ($missing | is-not-empty) {
